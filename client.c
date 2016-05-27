@@ -5,7 +5,7 @@
 /* Spring 2014	*/
 /****************/
 
-#define DEBUG
+//#define DEBUG
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -14,7 +14,25 @@
 #include <unistd.h>
 #include <assert.h>
 
-#include <client.h>
+#include "client.h"
+#include "network.h"
+
+
+/*
+ * Global Virables
+ */
+
+static	int		mySock = -1;
+static Sockaddr	*myAddr = NULL;
+
+static uint16_t 	myTransNum;
+static uint32_t 	myFileID;
+static int 		myNumServers = -1;
+static int 		myPacketLoss = -1;
+
+static uint32_t 	mySeqNum	= -1;
+static uint32_t	myGlobalID;
+
 
 /* ------------------------------------------------------------------ */
 
@@ -28,8 +46,31 @@ InitReplFs( unsigned short portNum, int packetLoss, int numServers ) {
   /****************************************************/
   /* Initialize network access, local state, etc.     */
   /****************************************************/
+	if (packetLoss < 0 || packetLoss > 100 || numServers < 0) {
+		RFError("Wrong Input Params.");
+		return ErrorReturn;
+	}
 
-  return( NormalReturn );  
+	// check if already initialized
+	if (myAddr != NULL || mySock != -1 || myPacketLoss != -1 || myNumServers != -1) {
+		RFError("Already initialized.");
+		return ErrorReturn;
+	}
+
+	myPacketLoss = packetLoss;
+	myNumServers = numServers;
+	mySeqNum = 0;
+	myGlobalID = random();
+
+
+	dbg_printf("addr = %p\n", &mySock);
+
+  	netInit(portNum, &mySock, myAddr);
+  	printf("123\n");
+
+  	dbg_printf("Finish InitReplFs: mysock = %d\n", mySock);
+
+  	return ErrorReturn;
 }
 
 /* ------------------------------------------------------------------ */
@@ -150,7 +191,6 @@ CloseFile( int fd ) {
 }
 
 /* ------------------------------------------------------------------ */
-
 
 
 

@@ -4,6 +4,8 @@
 /* CS 244B	*/
 /* Spring 2013	*/
 /****************/
+#ifndef CLIENT_H_
+#define CLIENT_H_
 
 enum {
   NormalReturn = 0,
@@ -41,6 +43,8 @@ extern int CloseFile(int fd);
 #endif
 
 /* ------------------------------------------------------------------ */
+
+#endif
 
 
 

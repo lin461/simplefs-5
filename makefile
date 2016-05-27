@@ -11,7 +11,7 @@ INCDIR	= -I$(H)
 LIBDIRS = -L$(C_DIR)
 LIBS    = -lclientReplFs
 
-CLIENT_OBJECTS = client.o
+CLIENT_OBJECTS = client.o network.o
 
 all:	appl
 
@@ -25,8 +25,11 @@ $(C_DIR)/libclientReplFs.a:	$(CLIENT_OBJECTS)
 	ar cr libclientReplFs.a $(CLIENT_OBJECTS)
 	ranlib libclientReplFs.a
 
-client.o:	client.c client.h
+client.o:	client.c client.h network.h
 	$(CCF) -c $(INCDIR) client.c
+	
+network.o:	network.c network.h
+	$(CCF) -c $(INCDIR) network.c
 
 clean:
 	rm -f appl *.o *.a
