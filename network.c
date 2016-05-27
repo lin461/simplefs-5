@@ -73,10 +73,10 @@
 
 /* ----------------------------------------------------------------------- */
 
-void netInit(in_port_t port, int *multisock, Sockaddr *groupAddr) {
+void netInit(in_port_t port, int *multisock, Sockaddr **groupAddr) {
 	dbg_printf("=== entering netInit === \n");
-	Sockaddr		nullAddr;
-	Sockaddr		*thisHost;
+	Sockaddr		*nullAddr;
+//	Sockaddr		*thisHost;
 //	char			buf[128];
 	int				reuse;
 	u_char          ttl;
@@ -86,7 +86,10 @@ void netInit(in_port_t port, int *multisock, Sockaddr *groupAddr) {
 //	gethostname(buf, sizeof(buf));
 //	if ((thisHost = resolveHost(buf)) == (Sockaddr *) NULL)
 //		RFError("who am I?");
-
+	
+	nullAddr = (Sockaddr*)malloc(sizeof(Sockaddr));
+	if (nullAddr == NULL)
+	  RFError("No enough memory.");
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sock < 0)
 	  RFError("can't get socket");
@@ -101,11 +104,10 @@ void netInit(in_port_t port, int *multisock, Sockaddr *groupAddr) {
 		RFError("setsockopt failed (SO_REUSEADDR)");
 	}
 
-	nullAddr.sin_family = AF_INET;
-	nullAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	nullAddr.sin_port = htons(port);
-	if (bind(sock, (struct sockaddr *)&nullAddr,
-		 sizeof(nullAddr)) < 0)
+	nullAddr->sin_family = AF_INET;
+	nullAddr->sin_addr.s_addr = htonl(INADDR_ANY);
+	nullAddr->sin_port = htons(port);
+	if (bind(sock, (Sockaddr *)nullAddr, sizeof(Sockaddr)) < 0)
 		RFError("netInit binding");
 
 	/* Multicast TTL:
@@ -135,8 +137,8 @@ void netInit(in_port_t port, int *multisock, Sockaddr *groupAddr) {
 
 	/* Get the multi-cast address ready to use in SendData()
            calls. */
-	nullAddr.sin_addr.s_addr = htonl(MULTICAST_GROUP);
-	memcpy(&groupAddr, &nullAddr, sizeof(Sockaddr));
+	nullAddr->sin_addr.s_addr = htonl(MULTICAST_GROUP);
+        *groupAddr = (Sockaddr *)nullAddr;
 	dbg_printf("Finish netInit: mysock = %d\n", sock);
 	dbg_printf("Finish netInit: addr = %p\n", multisock);
 	*multisock = sock;

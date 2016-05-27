@@ -100,6 +100,6 @@ typedef struct logEntry {
 void RFError(char *s);
 //void getHostName(char *prompt, char **hostName, Sockaddr *hostAddr);
 //Sockaddr *resolveHost(register char *name);
-void netInit(in_port_t port, int *multisock, Sockaddr *groupAddr);
+void netInit(in_port_t port, int *multisock, Sockaddr **groupAddr);
 
 #endif /* NETWORK_H_ */

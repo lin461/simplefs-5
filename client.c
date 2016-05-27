@@ -65,12 +65,11 @@ InitReplFs( unsigned short portNum, int packetLoss, int numServers ) {
 
 	dbg_printf("addr = %p\n", &mySock);
 
-  	netInit(portNum, &mySock, myAddr);
-  	printf("123\n");
+  	netInit(portNum, &mySock, &myAddr);
 
   	dbg_printf("Finish InitReplFs: mysock = %d\n", mySock);
 
-  	return ErrorReturn;
+  	return NormalReturn;
 }
 
 /* ------------------------------------------------------------------ */
