@@ -7,9 +7,7 @@
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <string.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 
 #include "network.h"
 
@@ -109,7 +107,7 @@ int netInit(in_port_t port, int *multisock, Sockaddr **groupAddr) {
 	nullAddr->sin_family = AF_INET;
 	nullAddr->sin_addr.s_addr = htonl(INADDR_ANY);
 	nullAddr->sin_port = htons(port);
-	if (bind(sock, (Sockaddr *) nullAddr, sizeof(Sockaddr)) < 0) {
+	if (bind(sock, (struct sockaddr *) nullAddr, sizeof(Sockaddr)) < 0) {
 		RFError("netInit binding");
 		return -1;
 	}
@@ -147,6 +145,8 @@ int netInit(in_port_t port, int *multisock, Sockaddr **groupAddr) {
 	dbg_printf("Finish netInit: mysock = %d\n", sock);
 	dbg_printf("Finish netInit: addr = %p\n", multisock);
 	*multisock = sock;
+
+	return 1;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -198,10 +198,16 @@ void initPktHeader(pktHeader_t *pkt, uint16_t type, uint32_t gid,
 //}
 /* ----------------------------------------------------------------------- */
 // Heler
-void print_header(pktHeader_t *pkt) {
-	dbg_printf("type = %d\n", pkt->type);
-	dbg_printf("gid = %ld\n", pkt->gid);
-	dbg_printf("seqid = %ld\n", pkt->seqid);
+void print_header(pktHeader_t *pkt, bool recv) {
+	if (recv) {
+		dbg_printf("--Receive-----------------------------------\n");
+	} else {
+		dbg_printf("--Send-------------------------------------\n");
+	}
+	dbg_printf("|\ttype\t=\t%d\n", pkt->type);
+	dbg_printf("|\tgid\t=\t%u\n", ntohl(pkt->gid));
+	dbg_printf("|\tseqid\t=\t%u\n", ntohl(pkt->seqid));
+	dbg_printf("--------------------------------------------\n");
 }
 
 /* ----------------------------------------------------------------------- */

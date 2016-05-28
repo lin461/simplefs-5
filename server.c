@@ -13,6 +13,7 @@ static int 	sport = 44054;
 static int 		sPacketLoss = -1;
 static uint32_t 	sSeqNum	= -1;
 static uint32_t	sGlobalID;
+static uint32_t	sTransNum;
 static char *sfilename = NULL;
 static char smountPath[MAXMAXPATHLEN];
 static uint32_t scurFileID = -1;
@@ -48,27 +49,28 @@ int initServer(unsigned short portNum, char *mount, int drop) {
 		RFError("netinit Fails.");
 		return -1;
 	}
+
+	return 1;
 }
 
 /* ----------------------------------------------------------------------- */
-void processPktInit(pktCommon_t *pkt) {
+void processPktInit(pktHeader_t *pkt) {
 	dbg_printf("== in processPktInit====\n");
-	dbg_printf("Receive packet\n");
-	print_header(pkt);
+	print_header(pkt, true);
 
-	uint32_t cseq = ntohl(pkt->header.seqid);
-	uint32_t cgid = ntohl(pkt->header.gid);
+	uint32_t cseq = ntohl(pkt->seqid);
+	uint32_t cgid = ntohl(pkt->gid);
 
 	pktHeader_t *p = (pktHeader_t*)alloca(sizeof(pktHeader_t));
 	p->gid = htonl(sGlobalID);
-	p->seqid = htonl(sSeqNum++);
+	p->seqid = htonl(sSeqNum);
+	sSeqNum++;
 	p->type = PKT_INITACK;
 
-	dbg_printf("Sendout packet\n");
-	print_header(p);
+	print_header(p, false);
 
 	if (sendto(ssock, (void *) p, sizeof(pktHeader_t),
-			0, (Sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
+			0, (struct sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
 		RFError("SendOut fail\n");
 		//TODO
 	}
@@ -94,7 +96,7 @@ int main(int argc, char *argv[]) {
 
 	// TODO check input
 	while(1) {
-		cc = recvfrom(ssock, &pkt, sizeof(pkt), 0, &addr, &size);
+		cc = recvfrom(ssock, &pkt, sizeof(pkt), 0, (struct sockaddr *)&addr, (socklen_t *)&size);
 		if (cc < 0) {
 			RFError("recev error.");
 			//TODO
@@ -103,7 +105,7 @@ int main(int argc, char *argv[]) {
 
 		switch(pkt.header.type) {
 			case PKT_INIT:
-				processPktInit(&pkt.common);
+				processPktInit(&pkt.header);
 				break;
 			case PKT_INITACK:
 				break;

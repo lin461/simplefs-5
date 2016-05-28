@@ -24,13 +24,16 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define MAXFILENAMELEN	128
 #define MAXBUFFERSIZE	512
 #define MAXMAXPATHLEN	128
 
-#define WAIT_TIMEOUT			3000
-#define RESEND_TIMEOUT			3000
+#define WAIT_TIMEOUT			5000
+#define RESEND_TIMEOUT			1000
 
 
 #define PKT_INIT			0
@@ -69,32 +72,40 @@ typedef struct OpenACKPkt {
 
 typedef struct WriteBlkPkt {
 	pktHeader_t header;
+	uint8_t	writeNum;
+	uint16_t blocksize;
 	uint32_t fileid;
-	uint16_t transNum;
-	uint16_t writeNum;
-	uint16_t offset;
-	uint16_t size;
+	uint32_t transNum;
+	uint32_t offset;
 	char buffer[MAXBUFFERSIZE];
 } pktWriteBlk_t;
 
 typedef struct CommitReqPkt {
 	pktHeader_t header;
-	uint16_t transNum;
-	uint16_t totalWriteNum;
+	uint8_t totalWriteNum;
 	uint32_t fileid;
+	uint32_t transNum;
 } pktCommitReq_t;
 
-typedef struct CommonPkt {
+typedef struct CommonPkt { //CommitYes, CommitACK, AbortACK
 	pktHeader_t header;
-	uint16_t transNum;
 	uint32_t fileid;
+	uint32_t transNum;
 } pktCommon_t;
+
+typedef struct CommitAbortPkt { //Commit, Abort
+	pktHeader_t header;
+	uint8_t	closeflag;
+	uint32_t fileid;
+	uint32_t transNum;
+} pktCommitAbort_t;
 
 typedef struct CommitRePkt {
 	pktHeader_t header;
-	uint16_t transNum;
-	uint16_t writeNumResend;
 	uint32_t fileid;
+	uint32_t transNum;
+	uint32_t H_writeNumReq;
+	uint32_t L_writeNumReq;
 } pktCommitRe_t;
 
 typedef union GenericPkt {
@@ -104,6 +115,7 @@ typedef union GenericPkt {
 	pktWriteBlk_t	writeblock;
 	pktCommitReq_t	commitreq;
 	pktCommon_t		common;
+	pktCommitAbort_t commitabort;
 	pktCommitRe_t	commitre;
 } pktGeneric_t;
 
@@ -123,6 +135,6 @@ int netInit(in_port_t port, int *multisock, Sockaddr **groupAddr);
 bool isTimeout(struct timeval oldtime, long timeout);
 uint32_t genRandom();
 
-void print_header(pktHeader_t *pkt);
+void print_header(pktHeader_t *pkt, bool recv);
 
 #endif /* NETWORK_H_ */

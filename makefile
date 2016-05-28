@@ -1,5 +1,6 @@
 
 CFLAGS	= -g -Wall -DSUN
+CFLAGS += -Wno-unused-variable
 # CFLAGS	= -g -Wall -DDEC
 CC	= gcc
 CCF	= $(CC) $(CFLAGS)
