@@ -6,11 +6,10 @@
  */
 
 #include <netinet/in.h>
-#include <stdio.h>
 #include <arpa/inet.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 
 #include "network.h"
 
@@ -73,72 +72,78 @@
 
 /* ----------------------------------------------------------------------- */
 
-void netInit(in_port_t port, int *multisock, Sockaddr **groupAddr) {
+int netInit(in_port_t port, int *multisock, Sockaddr **groupAddr) {
 	dbg_printf("=== entering netInit === \n");
-	Sockaddr		*nullAddr;
+	Sockaddr *nullAddr;
 //	Sockaddr		*thisHost;
 //	char			buf[128];
-	int				reuse;
-	u_char          ttl;
-	struct ip_mreq  mreq;
-	int 			sock;
+	int reuse;
+	u_char ttl;
+	struct ip_mreq mreq;
+	int sock;
 
 //	gethostname(buf, sizeof(buf));
 //	if ((thisHost = resolveHost(buf)) == (Sockaddr *) NULL)
 //		RFError("who am I?");
-	
-	nullAddr = (Sockaddr*)malloc(sizeof(Sockaddr));
-	if (nullAddr == NULL)
-	  RFError("No enough memory.");
-	sock = socket(AF_INET, SOCK_DGRAM, 0);
-	if (sock < 0)
-	  RFError("can't get socket");
 
+	nullAddr = (Sockaddr*) malloc(sizeof(Sockaddr));
+	if (nullAddr == NULL) {
+		RFError("No enough memory.");
+		return -1;
+	}
+	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock < 0) {
+		RFError("can't get socket");
+		return -1;
+	}
 
 	/* SO_REUSEADDR allows more than one binding to the same
-	   socket - you cannot have more than one player on one
-	   machine without this */
+	 socket - you cannot have more than one player on one
+	 machine without this */
 	reuse = 1;
-	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse,
-		   sizeof(reuse)) < 0) {
+	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
 		RFError("setsockopt failed (SO_REUSEADDR)");
+		return -1;
 	}
 
 	nullAddr->sin_family = AF_INET;
 	nullAddr->sin_addr.s_addr = htonl(INADDR_ANY);
 	nullAddr->sin_port = htons(port);
-	if (bind(sock, (Sockaddr *)nullAddr, sizeof(Sockaddr)) < 0)
+	if (bind(sock, (Sockaddr *) nullAddr, sizeof(Sockaddr)) < 0) {
 		RFError("netInit binding");
+		return -1;
+	}
 
 	/* Multicast TTL:
-	   0 restricted to the same host
-	   1 restricted to the same subnet
-	   32 restricted to the same site
-	   64 restricted to the same region
-	   128 restricted to the same continent
-	   255 unrestricted
+	 0 restricted to the same host
+	 1 restricted to the same subnet
+	 32 restricted to the same site
+	 64 restricted to the same region
+	 128 restricted to the same continent
+	 255 unrestricted
 
-	   DO NOT use a value > 32. If possible, use a value of 1 when
-	   testing.
-	*/
+	 DO NOT use a value > 32. If possible, use a value of 1 when
+	 testing.
+	 */
 	ttl = 1;
-	if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl,
-		   sizeof(ttl)) < 0) {
+	if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0) {
 		RFError("setsockopt failed (IP_MULTICAST_TTL)");
+		return -1;
 	}
 
 	/* join the multicast group */
 	mreq.imr_multiaddr.s_addr = htonl(MULTICAST_GROUP);
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-	if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)
-		   &mreq, sizeof(mreq)) < 0) {
+	if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &mreq,
+			sizeof(mreq)) < 0) {
 		RFError("setsockopt failed (IP_ADD_MEMBERSHIP)");
+		return -1;
 	}
 
 	/* Get the multi-cast address ready to use in SendData()
-           calls. */
+	 calls. */
 	nullAddr->sin_addr.s_addr = htonl(MULTICAST_GROUP);
-        *groupAddr = (Sockaddr *)nullAddr;
+	*groupAddr = (Sockaddr *) nullAddr;
 	dbg_printf("Finish netInit: mysock = %d\n", sock);
 	dbg_printf("Finish netInit: addr = %p\n", multisock);
 	*multisock = sock;
@@ -151,8 +156,59 @@ void RFError(char *s)
 {
 	fprintf(stderr, "CS244BReplFs: %s\n", s);
 	perror("CS244BReplFs");
-	exit(-1);
 }
 
 /* ----------------------------------------------------------------------- */
+
+bool isTimeout(struct timeval oldtime, long timeout) {
+	struct timeval newtime;
+	gettimeofday(&newtime, NULL);
+	return ((newtime.tv_sec - oldtime.tv_sec) * 1000
+			+ (newtime.tv_usec - oldtime.tv_usec) / 1000) >= timeout ?
+			true : false;
+}
+
+/* ----------------------------------------------------------------------- */
+
+void initPktHeader(pktHeader_t *pkt, uint16_t type, uint32_t gid,
+		uint32_t seqid) {
+	pkt->type = htons(type);
+	pkt->gid = htonl(gid);
+	pkt->seqid = htonl(seqid);
+}
+
+/* ----------------------------------------------------------------------- */
+
+//void sendCommonPkt(uint16_t type, uint32_t gid, uint32_t seqid, uint16_t transNum, uint32_t fileid) {
+//	pktCommon_t *pkt = (pktCommon_t *)alloca(sizeof(pktHeader_t));
+//	initPktHeader(&pkt->header, type, gid, seqid);
+//
+//	pktCommon_t *p;
+//
+//}
+/* ----------------------------------------------------------------------- */
+//int pktRecv(int packetLoss, int sock, void *buf, int len, int flags, Sockaddr *addr, int *addrlen) {
+//	uint32_t randnum = random();
+////	if ()
+//
+//	int cc;
+//	cc = recvfrom(sock, buf, len, flags, addr, addrlen);
+//
+//
+//}
+/* ----------------------------------------------------------------------- */
+// Heler
+void print_header(pktHeader_t *pkt) {
+	dbg_printf("type = %d\n", pkt->type);
+	dbg_printf("gid = %ld\n", pkt->gid);
+	dbg_printf("seqid = %ld\n", pkt->seqid);
+}
+
+/* ----------------------------------------------------------------------- */
+uint32_t genRandom() {
+	  struct timeval	now;
+	  gettimeofday (&now, NULL);
+	  srand(now.tv_usec/16000);
+	  return random();
+}
 

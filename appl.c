@@ -34,6 +34,8 @@ main() {
     return( ErrorExit );
   }
 
+  return 0;
+
   /*****************************/
   /* Open the file for writing */
   /*****************************/

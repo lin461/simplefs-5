@@ -25,6 +25,8 @@
 static	int		mySock = -1;
 static Sockaddr	*myAddr = NULL;
 
+static logEntry_t	*myWriteLogs;
+
 static uint16_t 	myTransNum;
 static uint32_t 	myFileID;
 static int 		myNumServers = -1;
@@ -33,6 +35,8 @@ static int 		myPacketLoss = -1;
 static uint32_t 	mySeqNum	= -1;
 static uint32_t	myGlobalID;
 
+static struct timeval myLastStartTime;
+static struct timeval myLastSendTime;
 
 /* ------------------------------------------------------------------ */
 
@@ -60,14 +64,27 @@ InitReplFs( unsigned short portNum, int packetLoss, int numServers ) {
 	myPacketLoss = packetLoss;
 	myNumServers = numServers;
 	mySeqNum = 0;
-	myGlobalID = random();
+	myGlobalID = genRandom();
 
 
 	dbg_printf("addr = %p\n", &mySock);
 
-  	netInit(portNum, &mySock, &myAddr);
+  	if (netInit(portNum, &mySock, &myAddr) < 0) {
+  		RFError("netInit Fail.");
+  		return ErrorReturn;
+  	}
 
   	dbg_printf("Finish InitReplFs: mysock = %d\n", mySock);
+
+  	// init log array
+  	myWriteLogs = (logEntry_t*)calloc(myNumServers, sizeof(logEntry_t));
+  	if (myWriteLogs == NULL) {
+  		RFError("No memory.");
+  		return ErrorReturn;
+  	}
+
+  	checkServers(numServers);
+
 
   	return NormalReturn;
 }
@@ -190,6 +207,30 @@ CloseFile( int fd ) {
 }
 
 /* ------------------------------------------------------------------ */
+int checkServers(int inputNumServers) {
+	dbg_printf("Starting check available servers.\n");
+	int i = 0;
 
+	// sendout Init packet
+	pktHeader_t *p = (pktHeader_t*)alloca(sizeof(pktHeader_t));
+	p->gid = htonl(myGlobalID);
+	p->seqid = htonl(mySeqNum++);
+	p->type = PKT_INIT;
+
+	dbg_printf("Sendout packet\n");
+	print_header(p);
+
+	if (sendto(mySock, (void *) p, sizeof(pktHeader_t),
+			0, (Sockaddr *) myAddr, sizeof(Sockaddr)) < 0) {
+		RFError("SendOut fail\n");
+		return ErrorReturn;
+	}
+
+//	gettimeofday(&myLastStartTime, NULL);
+//	for (; i < inputNumServers && isTimeout(myLastStartTime, WAIT_TIMEOUT); i++) {
+//
+//
+//	}
+}
 
 

@@ -37,6 +37,7 @@ extern int WriteBlock(int fd, char * strData, int byteOffset, int blockSize);
 extern int Commit(int fd);
 extern int Abort(int fd);
 extern int CloseFile(int fd);
+int checkServers(int inputNumServers);
 
 #ifdef __cplusplus
 }

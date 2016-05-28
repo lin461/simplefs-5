@@ -20,9 +20,18 @@
 
 #include <stdint.h>
 #include <netdb.h>
+#include <sys/time.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #define MAXFILENAMELEN	128
 #define MAXBUFFERSIZE	512
+#define MAXMAXPATHLEN	128
+
+#define WAIT_TIMEOUT			3000
+#define RESEND_TIMEOUT			3000
+
 
 #define PKT_INIT			0
 #define PKT_INITACK			1
@@ -88,6 +97,16 @@ typedef struct CommitRePkt {
 	uint32_t fileid;
 } pktCommitRe_t;
 
+typedef union GenericPkt {
+	pktHeader_t header;
+	pktOpen_t	open;
+	pktOpenACK_t	openack;
+	pktWriteBlk_t	writeblock;
+	pktCommitReq_t	commitreq;
+	pktCommon_t		common;
+	pktCommitRe_t	commitre;
+} pktGeneric_t;
+
 
 /*****************************/
 typedef struct logEntry {
@@ -100,6 +119,10 @@ typedef struct logEntry {
 void RFError(char *s);
 //void getHostName(char *prompt, char **hostName, Sockaddr *hostAddr);
 //Sockaddr *resolveHost(register char *name);
-void netInit(in_port_t port, int *multisock, Sockaddr **groupAddr);
+int netInit(in_port_t port, int *multisock, Sockaddr **groupAddr);
+bool isTimeout(struct timeval oldtime, long timeout);
+uint32_t genRandom();
+
+void print_header(pktHeader_t *pkt);
 
 #endif /* NETWORK_H_ */
