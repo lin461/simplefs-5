@@ -40,5 +40,5 @@ server.o:	server.c network.h
 	$(CCF) -c $(INCDIR) server.c
 
 clean:
-	rm -f appl *.o *.a
+	rm -f appl replFsServer *.o *.a
 
