@@ -7,6 +7,7 @@
 
 //#define DEBUG
 
+#include <sys/select.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -75,15 +76,21 @@ InitReplFs( unsigned short portNum, int packetLoss, int numServers ) {
   	}
 
   	dbg_printf("Finish InitReplFs: mysock = %d\n", mySock);
+  	dbg_printf("Finish InitReplFs: mtAddr = %p\n", myAddr);
 
   	// init log array
-  	myWriteLogs = (logEntry_t*)calloc(myNumServers, sizeof(logEntry_t));
-  	if (myWriteLogs == NULL) {
-  		RFError("No memory.");
+//  	myWriteLogs = (logEntry_t*)calloc(myNumServers, sizeof(logEntry_t));
+//  	if (myWriteLogs == NULL) {
+//  		RFError("No memory.");
+//  		return ErrorReturn;
+//  	}
+
+  	if (checkServers(numServers) < 0) {
+  		RFError("check servers Fail.");
   		return ErrorReturn;
   	}
 
-  	checkServers(numServers);
+  	dbg_printf("done check server\n");
 
 
   	return NormalReturn;
@@ -215,6 +222,8 @@ int checkServers(int inputNumServers) {
 	struct timeval sendTime;
 	pktGeneric_t pkt;
 
+	fd_set fdmask;
+
 	uint32_t serverids[inputNumServers];
 	memset(serverids, 0, inputNumServers);
 	// sendout Init packet
@@ -223,21 +232,26 @@ int checkServers(int inputNumServers) {
 	p->seqid = htonl(mySeqNum++);
 	p->type = PKT_INIT;
 
-	dbg_printf("Sendout packet\n");
 	print_header(p, false);
 
+	dbg_printf("myAddr = %p, p = %p\n", myAddr, p);
 	if (sendto(mySock, (void *) p, sizeof(pktHeader_t),
-			0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) < 0) {
+			0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 		RFError("SendOut fail\n");
 		// TODO how to deal with this
 		return ErrorReturn;
 	}
+	dbg_printf("== myAddr = %p, p = %p\n", myAddr, p);
 
 	gettimeofday (&startTime, NULL);
 	gettimeofday (&sendTime, NULL);
 
 	int size = sizeof(Sockaddr);
 	while (1) {
+		dbg_printf("in while...\n");
+		FD_ZERO(&fdmask);
+		FD_SET(mySock, &fdmask);
+
 		if (currentServers == inputNumServers) {
 			dbg_printf("have enough servers.\n");
 			return 1;
@@ -249,18 +263,49 @@ int checkServers(int inputNumServers) {
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
 			dbg_printf("timeout resend.\n");
 			print_header(p, false);
-			sendto(mySock, (void *) p, sizeof(pktHeader_t),
-					0, (struct sockaddr *) myAddr, sizeof(Sockaddr));
+			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
+			if (sendto(mySock, (void *) p, sizeof(pktHeader_t),
+					0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
+				RFError("SendOut fail");
+				// TODO how to deal with this
+				return ErrorReturn;
+			}
 			gettimeofday (&sendTime, NULL);
 		}
 
-		res = recvfrom(mySock, &pkt, sizeof(pkt), 0, (struct sockaddr *)&myAddr, (socklen_t *)&size);
-		if (res < 0) {
-			RFError("recev error."); //TODO continue..
+		struct timeval remain;
+		getRemainTime(sendTime, RESEND_TIMEOUT_SEC, &remain);
+
+//		dbg_printf("... here time = %ld.%06ld \n", remain.tv_sec, remain.tv_usec);
+		if (select(32, &fdmask, NULL, NULL, &remain) <= 0) {
+//			RFError("select failed");
+			dbg_printf("continue from select.\n");
+			continue;
+		}
+
+		// another way
+//		if (setsockopt(mySock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+//			RFError("setsockopt failed (SO_RCVTIMEO)");
+//			return -1;
+//		}
+//		dbg_printf("wait for packet. - %p\n", &pkt);
+
+		// need to copy sockaddr, since recvfrom will fill it.
+//		Sockaddr recv_addr;
+//		memcpy(&recv_addr, myAddr, size);
+//
+//		res = recvfrom(mySock, &pkt, sizeof(pkt), 0, (struct sockaddr *)&recv_addr, (socklen_t *)&size);
+		res = recvfrom(mySock, &pkt, sizeof(pkt), 0, NULL, NULL);
+		if (res <= 0) {
+			// If nothing received, try again,
+//			RFError("recev error."); //TODO continue..
+			dbg_printf("continue from recvfrom.\n");
+			continue;
 		}
 
 		// process packet and update server number
 		if (pkt.header.type != PKT_INITACK || pkt.header.gid == myGlobalID) {
+			dbg_printf("Wrong type or mine\n");
 			continue;
 		}
 
@@ -268,16 +313,50 @@ int checkServers(int inputNumServers) {
 		print_header(precv, true);
 		uint32_t sgid = ntohl(precv->gid);
 		int i = 0;
-		for(; i < inputNumServers; i++) {
-			if (serverids[i] != sgid) {
-				serverids[i] = sgid;
+		for(; i < currentServers; i++) {
+			if (serverids[i] == sgid) {
+				dbg_printf("Duplicated\n");
+				break;
 			}
 		}
-		currentServers = i;
+		if (i == currentServers) {
+			serverids[i] = sgid;
+			currentServers++;
+		}
 		dbg_printf("currentServers=%d\n", currentServers);
 	}
 
 	return 1;
 }
 
+/* ------------------------------------------------------------------ */
+void getRemainTime(struct timeval start, long int timeout, struct timeval *remain) {
+	struct timeval diff, current;
+	gettimeofday(&current, NULL);
+	diff.tv_sec = current.tv_sec - start.tv_sec;
+	diff.tv_usec = current.tv_usec - start.tv_usec;
+
+	if (diff.tv_usec < 0) {
+		diff.tv_sec--;
+		diff.tv_usec += 1000000;
+	}
+
+	struct timeval to;
+	to.tv_sec = timeout;
+	to.tv_usec = 0;
+
+	remain->tv_sec = to.tv_sec - diff.tv_sec;
+	remain->tv_usec = to.tv_usec - diff.tv_usec;
+
+	if (remain->tv_usec < 0) {
+		remain->tv_sec--;
+		remain->tv_usec += 1000000;
+	}
+
+	if ((remain->tv_sec < 0) ||
+			((remain->tv_sec == 0) && (remain->tv_usec <= 0))) {
+		remain->tv_sec = 0;
+		remain->tv_usec = 0;
+	}
+}
 

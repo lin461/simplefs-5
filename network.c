@@ -143,7 +143,7 @@ int netInit(in_port_t port, int *multisock, Sockaddr **groupAddr) {
 	nullAddr->sin_addr.s_addr = htonl(MULTICAST_GROUP);
 	*groupAddr = (Sockaddr *) nullAddr;
 	dbg_printf("Finish netInit: mysock = %d\n", sock);
-	dbg_printf("Finish netInit: addr = %p\n", multisock);
+	dbg_printf("Finish netInit: addr = %p\n", nullAddr);
 	*multisock = sock;
 
 	return 1;
@@ -178,26 +178,7 @@ void initPktHeader(pktHeader_t *pkt, uint16_t type, uint32_t gid,
 }
 
 /* ----------------------------------------------------------------------- */
-
-//void sendCommonPkt(uint16_t type, uint32_t gid, uint32_t seqid, uint16_t transNum, uint32_t fileid) {
-//	pktCommon_t *pkt = (pktCommon_t *)alloca(sizeof(pktHeader_t));
-//	initPktHeader(&pkt->header, type, gid, seqid);
-//
-//	pktCommon_t *p;
-//
-//}
-/* ----------------------------------------------------------------------- */
-//int pktRecv(int packetLoss, int sock, void *buf, int len, int flags, Sockaddr *addr, int *addrlen) {
-//	uint32_t randnum = random();
-////	if ()
-//
-//	int cc;
-//	cc = recvfrom(sock, buf, len, flags, addr, addrlen);
-//
-//
-//}
-/* ----------------------------------------------------------------------- */
-// Heler
+// Helper
 void print_header(pktHeader_t *pkt, bool recv) {
 	if (recv) {
 		dbg_printf("--Receive-----------------------------------\n");

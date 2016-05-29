@@ -50,6 +50,9 @@ int initServer(unsigned short portNum, char *mount, int drop) {
 		return -1;
 	}
 
+  	dbg_printf("Finish InitReplFs: mysock = %d\n", ssock);
+  	dbg_printf("Finish InitReplFs: myAddr = %p\n", sAddr);
+
 	return 1;
 }
 
@@ -82,9 +85,14 @@ void processPktInit(pktHeader_t *pkt) {
 /* ----------------------------------------------------------------------- */
 
 int main(int argc, char *argv[]) {
-	Sockaddr addr;
 	int size = sizeof(Sockaddr);
-	char *mountpath = "./mountpath";
+//	char *mountpath = "./mountpath";
+	char mountpath[MAXMAXPATHLEN];
+
+//	sport = atoi(argv[1]);
+//	strncpy(mountpath, argv[2], MAXMAXPATHLEN);
+	strncpy(mountpath, argv[1], MAXMAXPATHLEN);
+	int drop = atoi(argv[3]);
 
 	if (initServer(sport, mountpath, 0) < 0) {
 		RFError("InitServer fail.");
@@ -96,8 +104,11 @@ int main(int argc, char *argv[]) {
 
 	// TODO check input
 	while(1) {
-		cc = recvfrom(ssock, &pkt, sizeof(pkt), 0, (struct sockaddr *)&addr, (socklen_t *)&size);
-		if (cc < 0) {
+		dbg_printf("myAddr = %p, p = %p\n", sAddr, &pkt);
+//		cc = recvfrom(ssock, &pkt, sizeof(pkt), 0, (struct sockaddr *)sAddr, (socklen_t *)&size);
+		cc = recvfrom(ssock, &pkt, sizeof(pkt), 0, NULL, NULL);
+//		print_header(&pkt.header, true);
+		if (cc <= 0) {
 			RFError("recev error.");
 			//TODO
 			exit(-1);

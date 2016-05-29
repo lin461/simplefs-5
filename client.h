@@ -7,6 +7,8 @@
 #ifndef CLIENT_H_
 #define CLIENT_H_
 
+#include <sys/time.h>
+
 enum {
   NormalReturn = 0,
   ErrorReturn = -1,
@@ -38,6 +40,11 @@ extern int Commit(int fd);
 extern int Abort(int fd);
 extern int CloseFile(int fd);
 int checkServers(int inputNumServers);
+
+//void getTimeDiff(struct timeval *x, struct timeval *y, struct timeval *diff);
+//void getPassTime(struct timeval *y, struct timeval *remain);
+
+void getRemainTime(struct timeval start, long int timeout, struct timeval *remain);
 
 #ifdef __cplusplus
 }

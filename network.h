@@ -32,9 +32,9 @@
 #define MAXBUFFERSIZE	512
 #define MAXMAXPATHLEN	128
 
-#define WAIT_TIMEOUT			5000
+#define WAIT_TIMEOUT			3000
 #define RESEND_TIMEOUT			1000
-
+#define RESEND_TIMEOUT_SEC		1
 
 #define PKT_INIT			0
 #define PKT_INITACK			1
