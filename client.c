@@ -29,9 +29,11 @@ static Sockaddr	*myAddr = NULL;
 static logEntry_t	*myWriteLogs;
 
 static uint32_t 	myTransNum;
-static uint32_t 	myFileID;
+static uint32_t 	myFileID = -1;
 static int 		myNumServers = -1;
 static int 		myPacketLoss = -1;
+
+static char	*myFilename = NULL;
 
 static uint32_t 	mySeqNum	= -1;
 static uint32_t	myGlobalID;
@@ -90,7 +92,7 @@ InitReplFs( unsigned short portNum, int packetLoss, int numServers ) {
   		return ErrorReturn;
   	}
 
-  	dbg_printf("done check server\n");
+//  	dbg_printf("done check server\n");
 
 
   	return NormalReturn;
@@ -98,24 +100,43 @@ InitReplFs( unsigned short portNum, int packetLoss, int numServers ) {
 
 /* ------------------------------------------------------------------ */
 
-int
-OpenFile( char * fileName ) {
-  int fd;
+int OpenFile(char * fileName) {
+	int fd;
 
-  ASSERT( fileName );
-
-#ifdef DEBUG
-  printf( "OpenFile: Opening File '%s'\n", fileName );
-#endif
-
-  fd = open( fileName, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR );
+	ASSERT(fileName);
 
 #ifdef DEBUG
-  if ( fd < 0 )
-    perror( "OpenFile" );
+	printf("OpenFile: Opening File '%s'\n", fileName);
 #endif
 
-  return( fd );
+	// check if has opening file
+	if (myFileID != -1 || myFilename != NULL) {
+		RFError("Has file opened.");
+		return -1;
+	}
+	myFilename = (char *)calloc(MAXFILENAMELEN, sizeof(char));
+	if (myFilename == NULL) {
+		RFError("no enough memory!\n");
+		return -1;
+	}
+	strncpy(myFilename, fileName, MAXFILENAMELEN);
+	myFilename[MAXFILENAMELEN - 1] = '\0';
+
+	myFileID = genRandom();
+
+	if (openfilereq() < 0) {
+		return -1;
+	}
+
+//  fd = open( fileName, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR );
+//
+//#ifdef DEBUG
+//  if ( fd < 0 )
+//    perror( "OpenFile" );
+//#endif
+//
+//  return( fd );
+	return myFileID;
 }
 
 /* ------------------------------------------------------------------ */
@@ -214,6 +235,130 @@ CloseFile( int fd ) {
 }
 
 /* ------------------------------------------------------------------ */
+int openfilereq() {
+	dbg_printf("Starting openfile.\n");
+	int res;
+	int currentServers = 0;
+	struct timeval startTime, sendTime;
+	pktGeneric_t pkt;
+	fd_set fdmask;
+
+	uint32_t serverids[myNumServers];
+	memset(serverids, 0, myNumServers);
+
+	// send out open packet
+	pktOpen_t *p = (pktOpen_t *)alloca(sizeof(pktOpen_t));
+	p->header.gid = htonl(myGlobalID);
+	p->header.seqid = htonl(mySeqNum);
+	p->header.type = PKT_OPEN;
+	mySeqNum++;
+	strncpy((char *)p->filename, myFilename, MAXFILENAMELEN);
+	p->fileid = htonl(myFileID);
+
+	print_header(&p->header, false);
+
+	if (sendto(mySock, (void *) p, sizeof(pktOpen_t),
+			0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
+		RFError("SendOut fail\n");
+		// TODO how to deal with this
+		return ErrorReturn;
+	}
+
+	gettimeofday (&startTime, NULL);
+	gettimeofday (&sendTime, NULL);
+
+	int size = sizeof(Sockaddr);
+
+	while (1) {
+		dbg_printf("in while...\n");
+		FD_ZERO(&fdmask);
+		FD_SET(mySock, &fdmask);
+
+		if (currentServers == myNumServers) {
+			dbg_printf("have enough servers.\n");
+			return 0;
+		}
+		if (isTimeout(startTime, WAIT_TIMEOUT)) {
+			RFError("No enough servers. close fileID..");
+			// close file
+			myFileID = -1;
+			if (myFilename != NULL)
+				free(myFilename);
+			myFilename = NULL;
+			return -1;
+		}
+		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
+			dbg_printf("timeout resend.\n");
+			print_header(&p->header, false);
+			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
+			if (sendto(mySock, (void *) p, sizeof(pktOpen_t),
+					0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
+				RFError("SendOut fail");
+				// TODO how to deal with this
+				return ErrorReturn;
+			}
+			gettimeofday (&sendTime, NULL);
+		}
+
+		struct timeval remain;
+		getRemainTime(sendTime, RESEND_TIMEOUT_SEC, &remain);
+
+//		dbg_printf("... here time = %ld.%06ld \n", remain.tv_sec, remain.tv_usec);
+		if (select(32, &fdmask, NULL, NULL, &remain) <= 0) {
+			dbg_printf("continue from select.\n");
+			continue;
+		}
+
+		uint32_t rand = genRandom();
+
+		res = recvfrom(mySock, &pkt, sizeof(pkt), 0, NULL, NULL);
+		if (res <= 0) {
+			dbg_printf("continue from recvfrom.\n");
+			continue;
+		}
+		// drop packet
+		if ((rand % 100) < myPacketLoss) {
+			dbg_printf("packet dropped.\n");
+			continue;
+		}
+
+		uint32_t pktgid = ntohl(pkt.header.gid);
+		// process packet and update server number
+		if (pkt.header.type != PKT_OPENACK || pktgid == myGlobalID) {
+			dbg_printf("Wrong type or mine\n");
+			continue;
+		}
+
+		uint32_t pktfileid = ntohl(pkt.openack.fileid);
+		// drop if not the file requested to open
+		if (pktfileid != myFileID) {
+			dbg_printf("Not my open request.\n");
+			continue;
+		}
+
+		pktOpenACK_t *precv = (pktOpenACK_t*)&pkt.openack;
+		print_header(&precv->header, true);
+
+		// count current servers
+		uint32_t sgid = ntohl(precv->header.gid);
+		int i = 0;
+		for(; i < currentServers; i++) {
+			if (serverids[i] == sgid) {
+				dbg_printf("Duplicated\n");
+				break;
+			}
+		}
+		if (i == currentServers) {
+			serverids[i] = sgid;
+			currentServers++;
+		}
+		dbg_printf("currentServers=%d\n", currentServers);
+	}
+
+	return 0;
+}
+
+/* ------------------------------------------------------------------ */
 int checkServers(int inputNumServers) {
 	dbg_printf("Starting check available servers.\n");
 	int res;
@@ -229,32 +374,33 @@ int checkServers(int inputNumServers) {
 	// sendout Init packet
 	pktHeader_t *p = (pktHeader_t*)alloca(sizeof(pktHeader_t));
 	p->gid = htonl(myGlobalID);
-	p->seqid = htonl(mySeqNum++);
+	p->seqid = htonl(mySeqNum);
 	p->type = PKT_INIT;
+	mySeqNum++;
 
 	print_header(p, false);
 
-	dbg_printf("myAddr = %p, p = %p\n", myAddr, p);
+//	dbg_printf("myAddr = %p, p = %p\n", myAddr, p);
 	if (sendto(mySock, (void *) p, sizeof(pktHeader_t),
 			0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 		RFError("SendOut fail\n");
 		// TODO how to deal with this
 		return ErrorReturn;
 	}
-	dbg_printf("== myAddr = %p, p = %p\n", myAddr, p);
+//	dbg_printf("== myAddr = %p, p = %p\n", myAddr, p);
 
 	gettimeofday (&startTime, NULL);
 	gettimeofday (&sendTime, NULL);
 
 	int size = sizeof(Sockaddr);
 	while (1) {
-		dbg_printf("in while...\n");
+//		dbg_printf("in while...\n");
 		FD_ZERO(&fdmask);
 		FD_SET(mySock, &fdmask);
 
 		if (currentServers == inputNumServers) {
 			dbg_printf("have enough servers.\n");
-			return 1;
+			return 0;
 		}
 		if (isTimeout(startTime, WAIT_TIMEOUT)) {
 			RFError("No enough servers.");
@@ -278,28 +424,20 @@ int checkServers(int inputNumServers) {
 
 //		dbg_printf("... here time = %ld.%06ld \n", remain.tv_sec, remain.tv_usec);
 		if (select(32, &fdmask, NULL, NULL, &remain) <= 0) {
-//			RFError("select failed");
 			dbg_printf("continue from select.\n");
 			continue;
 		}
 
-		// another way
-//		if (setsockopt(mySock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-//			RFError("setsockopt failed (SO_RCVTIMEO)");
-//			return -1;
-//		}
-//		dbg_printf("wait for packet. - %p\n", &pkt);
+		uint32_t rand = genRandom();
 
-		// need to copy sockaddr, since recvfrom will fill it.
-//		Sockaddr recv_addr;
-//		memcpy(&recv_addr, myAddr, size);
-//
-//		res = recvfrom(mySock, &pkt, sizeof(pkt), 0, (struct sockaddr *)&recv_addr, (socklen_t *)&size);
 		res = recvfrom(mySock, &pkt, sizeof(pkt), 0, NULL, NULL);
 		if (res <= 0) {
-			// If nothing received, try again,
-//			RFError("recev error."); //TODO continue..
 			dbg_printf("continue from recvfrom.\n");
+			continue;
+		}
+		// drop packet
+		if ((rand % 100) < myPacketLoss) {
+			dbg_printf("packet dropped.\n");
 			continue;
 		}
 
@@ -309,6 +447,7 @@ int checkServers(int inputNumServers) {
 			continue;
 		}
 
+		// count current servers
 		pktHeader_t *precv = (pktHeader_t*)&pkt.header;
 		print_header(precv, true);
 		uint32_t sgid = ntohl(precv->gid);
@@ -326,7 +465,7 @@ int checkServers(int inputNumServers) {
 		dbg_printf("currentServers=%d\n", currentServers);
 	}
 
-	return 1;
+	return 0;
 }
 
 /* ------------------------------------------------------------------ */

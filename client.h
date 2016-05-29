@@ -40,6 +40,7 @@ extern int Commit(int fd);
 extern int Abort(int fd);
 extern int CloseFile(int fd);
 int checkServers(int inputNumServers);
+int openfilereq();
 
 //void getTimeDiff(struct timeval *x, struct timeval *y, struct timeval *diff);
 //void getPassTime(struct timeval *y, struct timeval *remain);

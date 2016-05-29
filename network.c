@@ -142,8 +142,8 @@ int netInit(in_port_t port, int *multisock, Sockaddr **groupAddr) {
 	 calls. */
 	nullAddr->sin_addr.s_addr = htonl(MULTICAST_GROUP);
 	*groupAddr = (Sockaddr *) nullAddr;
-	dbg_printf("Finish netInit: mysock = %d\n", sock);
-	dbg_printf("Finish netInit: addr = %p\n", nullAddr);
+//	dbg_printf("Finish netInit: mysock = %d\n", sock);
+//	dbg_printf("Finish netInit: addr = %p\n", nullAddr);
 	*multisock = sock;
 
 	return 1;

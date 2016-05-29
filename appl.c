@@ -16,7 +16,7 @@
 /* ------------------------------------------------------------------ */
 
 int
-main() {
+main(int argc, char *argv[]) {
 
   int fd;
   int loopCnt;
@@ -28,13 +28,11 @@ main() {
   /*****************************/
   /* Initialize the system     */
   /*****************************/
-  
-  if( InitReplFs( ReplFsPort, 0, 2 ) < 0 ) {
+
+  if( InitReplFs( ReplFsPort, atoi(argv[1]), atoi(argv[2]) ) < 0 ) {
     fprintf( stderr, "Error initializing the system\n" );
     return( ErrorExit );
   }
-
-  return 0;
 
   /*****************************/
   /* Open the file for writing */
@@ -46,6 +44,7 @@ main() {
     return( ErrorExit );
   }
 
+  return 0;
   /**************************************/
   /* Write incrementing numbers to the file */
   /**************************************/

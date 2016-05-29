@@ -16,7 +16,7 @@ static uint32_t	sGlobalID;
 static uint32_t	sTransNum;
 static char *sfilename = NULL;
 static char smountPath[MAXMAXPATHLEN];
-static uint32_t scurFileID = -1;
+static uint32_t sfileid = -1;
 
 
 /* ----------------------------------------------------------------------- */
@@ -36,8 +36,9 @@ int initServer(unsigned short portNum, char *mount, int drop) {
 	sSeqNum = 0;
 	sGlobalID = genRandom();
 
+
 	strncpy(smountPath, mount, MAXMAXPATHLEN);
-	dbg_printf("sizeof mount %s!\n", smountPath);
+	dbg_printf("mount path - %s!\n", smountPath);
 
 	int res = mkdir(smountPath, 0777);
 	if (res == -1) {
@@ -80,21 +81,58 @@ void processPktInit(pktHeader_t *pkt) {
 }
 
 /* ----------------------------------------------------------------------- */
+int processPktOpen(pktOpen_t *pkt) {
+	dbg_printf("== in processPktOpen====\n");
+	print_header(&pkt->header, true);
 
+	uint32_t cseq = ntohl(pkt->header.seqid);
+	uint32_t cgid = ntohl(pkt->header.gid);
+
+	if (sfilename != NULL)
+		free(sfilename);
+	sfilename = NULL;
+	sfileid = -1;
+
+	sfilename = (char *)calloc(MAXFILENAMELEN, sizeof(char));
+	if (sfilename == NULL) {
+		RFError("no enough memory!\n");
+		return -1;
+	}
+	strncpy((char *)sfilename, pkt->filename, MAXFILENAMELEN);
+	sfileid = ntohl(pkt->fileid);
+
+
+	pktOpenACK_t *p = (pktOpenACK_t*)alloca(sizeof(pktOpenACK_t));
+	p->header.gid = htonl(sGlobalID);
+	p->header.seqid = htonl(sSeqNum);
+	sSeqNum++;
+	p->header.type = PKT_OPENACK;
+
+	p->fileid = htonl(sfileid);
+
+	print_header(&p->header, false);
+
+	if (sendto(ssock, (void *) p, sizeof(pktOpenACK_t),
+			0, (struct sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
+		RFError("SendOut fail\n");
+		//TODO
+	}
+
+	return sfileid;
+}
 
 /* ----------------------------------------------------------------------- */
 
 int main(int argc, char *argv[]) {
 	int size = sizeof(Sockaddr);
-//	char *mountpath = "./mountpath";
 	char mountpath[MAXMAXPATHLEN];
 
 //	sport = atoi(argv[1]);
 //	strncpy(mountpath, argv[2], MAXMAXPATHLEN);
 	strncpy(mountpath, argv[1], MAXMAXPATHLEN);
-	int drop = atoi(argv[3]);
+	int drop = atoi(argv[2]);
 
-	if (initServer(sport, mountpath, 0) < 0) {
+	if (initServer(sport, mountpath, drop) < 0) {
 		RFError("InitServer fail.");
 		exit(-1);
 	}
@@ -104,14 +142,17 @@ int main(int argc, char *argv[]) {
 
 	// TODO check input
 	while(1) {
-		dbg_printf("myAddr = %p, p = %p\n", sAddr, &pkt);
 //		cc = recvfrom(ssock, &pkt, sizeof(pkt), 0, (struct sockaddr *)sAddr, (socklen_t *)&size);
+		uint32_t rand = genRandom();
 		cc = recvfrom(ssock, &pkt, sizeof(pkt), 0, NULL, NULL);
-//		print_header(&pkt.header, true);
 		if (cc <= 0) {
 			RFError("recev error.");
 			//TODO
-			exit(-1);
+			continue;
+		}
+		if ((rand % 100) < sPacketLoss) {
+			dbg_printf("packet dropped.\n");
+			continue;
 		}
 
 		switch(pkt.header.type) {
@@ -121,6 +162,7 @@ int main(int argc, char *argv[]) {
 			case PKT_INITACK:
 				break;
 			case PKT_OPEN:
+				processPktOpen(&pkt.open);
 				break;
 			case PKT_OPENACK:
 				break;

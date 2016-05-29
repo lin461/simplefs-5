@@ -5,6 +5,8 @@
 /* Spring 2013	*/
 /****************/
 
+#include <stdlib.h>
+
 int const MaxWrites = 128;
 int const MaxBlockLength = 512;
 
