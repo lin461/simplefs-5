@@ -26,9 +26,9 @@
 static	int		mySock = -1;
 static Sockaddr	*myAddr = NULL;
 
-static logEntry_t	*myWriteLogs;
 
-static uint32_t 	myTransNum;
+static uint32_t 	myTransNum = 0;
+static uint8_t		myWriteNum = -1;
 static uint32_t 	myFileID = -1;
 static int 		myNumServers = -1;
 static int 		myPacketLoss = -1;
@@ -38,6 +38,8 @@ static char	*myFilename = NULL;
 static uint32_t 	mySeqNum	= -1;
 static uint32_t	myGlobalID;
 
+static logEntry_t *myLogs[MAXWRITENUM];
+
 //static struct timeval myLastStartTime;
 //static struct timeval myLastSendTime;
 
@@ -46,7 +48,7 @@ static uint32_t	myGlobalID;
 int
 InitReplFs( unsigned short portNum, int packetLoss, int numServers ) {
 #ifdef DEBUG
-  printf( "InitReplFs: Port number %d, packet loss %d percent, %d servers\n", 
+  printf( "\n\nInitReplFs: Port number %d, packet loss %d percent, %d servers\n",
 	  portNum, packetLoss, numServers );
 #endif
 
@@ -106,11 +108,11 @@ int OpenFile(char * fileName) {
 	ASSERT(fileName);
 
 #ifdef DEBUG
-	printf("OpenFile: Opening File '%s'\n", fileName);
+	printf("\n\nOpenFile: Opening File '%s'\n", fileName);
 #endif
 
 	// check if has opening file
-	if (myFileID != -1 || myFilename != NULL) {
+	if (myFileID != -1 || myFilename != NULL || !ismyLogEmpty()) {
 		RFError("Has file opened.");
 		return -1;
 	}
@@ -128,6 +130,10 @@ int OpenFile(char * fileName) {
 		return -1;
 	}
 
+	// init write number;
+	myWriteNum = 0;
+
+
 //  fd = open( fileName, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR );
 //
 //#ifdef DEBUG
@@ -141,32 +147,80 @@ int OpenFile(char * fileName) {
 
 /* ------------------------------------------------------------------ */
 
-int
-WriteBlock( int fd, char * buffer, int byteOffset, int blockSize ) {
-  //char strError[64];
-  int bytesWritten;
+int WriteBlock(int fd, char * buffer, int byteOffset, int blockSize) {
+	//char strError[64];
+	int bytesWritten;
 
-  ASSERT( fd >= 0 );
-  ASSERT( byteOffset >= 0 );
-  ASSERT( buffer );
-  ASSERT( blockSize >= 0 && blockSize < MaxBlockLength );
+	ASSERT(fd >= 0);
+	ASSERT(byteOffset >= 0);
+	ASSERT(buffer);
+	ASSERT(blockSize >= 0 && blockSize < MaxBlockLength);
 
 #ifdef DEBUG
-  printf( "WriteBlock: Writing FD=%d, Offset=%d, Length=%d\n",
-	fd, byteOffset, blockSize );
+	printf("WriteBlock: Writing FD=%d, Offset=%d, Length=%d\n", fd, byteOffset,
+			blockSize);
 #endif
 
-  if ( lseek( fd, byteOffset, SEEK_SET ) < 0 ) {
-    perror( "WriteBlock Seek" );
-    return(ErrorReturn);
-  }
+	if (myFileID == -1) {
+		printf("No open file. \n");
+		return -1;
+	}
 
-  if ( ( bytesWritten = write( fd, buffer, blockSize ) ) < 0 ) {
-    perror( "WriteBlock write" );
-    return(ErrorReturn);
-  }
+	if (myFileID != fd) {
+		printf("Different open file.\n");
+		return -1;
+	}
 
-  return( bytesWritten );
+	// starting write
+	// add to log
+	logEntry_t* log = (logEntry_t*) calloc(1, sizeof(logEntry_t));
+	log->offset = byteOffset;
+	log->size = blockSize;
+	memcpy((char *) &log->buffer, buffer, blockSize);
+	myLogs[myWriteNum] = log;
+
+	// write to packet
+	pktWriteBlk_t *p = (pktWriteBlk_t *) alloca(sizeof(pktWriteBlk_t));
+	p->header.gid = htonl(myGlobalID);
+	p->header.seqid = htonl(mySeqNum);
+	p->header.type = PKT_WRITE;
+	mySeqNum++;
+	strncpy((char *) p->buffer, buffer, blockSize);
+	p->fileid = htonl(myFileID);
+	p->blocksize = htons(blockSize);
+	p->offset = htonl(byteOffset);
+	p->transNum = htonl(myTransNum);
+	p->writeNum = myWriteNum;
+
+//	print_header(&p->header, false);
+	print_writeBlk(p, false);
+
+	int res = sendto(mySock, (void *) p, sizeof(pktOpen_t),
+			0, (struct sockaddr *) myAddr, sizeof(Sockaddr));
+	if (res <= 0) {
+		RFError("SendOut fail\n");
+		// TODO how to deal with this
+		return ErrorReturn;
+	}
+
+	// update current write number
+	myWriteNum++;
+
+
+//	if (lseek(fd, byteOffset, SEEK_SET) < 0) {
+//		perror("WriteBlock Seek");
+//		return (ErrorReturn);
+//	}
+//
+//	if ((bytesWritten = write(fd, buffer, blockSize)) < 0) {
+//		perror("WriteBlock write");
+//		return (ErrorReturn);
+//	}
+//
+//	return (bytesWritten);
+
+//	print_logentry(myLogs);
+	return res;
 
 }
 
@@ -317,6 +371,7 @@ int openfilereq() {
 			continue;
 		}
 		// drop packet
+		dbg_printf("=== drop rate = %d\n", myPacketLoss);
 		if ((rand % 100) < myPacketLoss) {
 			dbg_printf("packet dropped.\n");
 			continue;
@@ -441,8 +496,9 @@ int checkServers(int inputNumServers) {
 			continue;
 		}
 
+		uint32_t pktgid = ntohl(pkt.header.gid);
 		// process packet and update server number
-		if (pkt.header.type != PKT_INITACK || pkt.header.gid == myGlobalID) {
+		if (pkt.header.type != PKT_INITACK || pktgid == myGlobalID) {
 			dbg_printf("Wrong type or mine\n");
 			continue;
 		}
@@ -499,3 +555,17 @@ void getRemainTime(struct timeval start, long int timeout, struct timeval *remai
 	}
 }
 
+/* ------------------------------------------------------------------ */
+bool ismyLogEmpty() {
+	if (myLogs == NULL) {
+		return true;
+	}
+	int i = 0;
+	for (; i < MAXWRITENUM; i++) {
+		if (myLogs[i] != NULL) {
+			return false;
+		}
+	}
+
+	return true;
+}

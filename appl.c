@@ -44,12 +44,12 @@ main(int argc, char *argv[]) {
     return( ErrorExit );
   }
 
-  return 0;
   /**************************************/
   /* Write incrementing numbers to the file */
   /**************************************/
 
-  for ( loopCnt=0; loopCnt<128; loopCnt++ ) {
+//  for ( loopCnt=0; loopCnt<128; loopCnt++ ) {
+  for ( loopCnt=0; loopCnt<5; loopCnt++ ) {
     sprintf( strData, "%d\n", loopCnt );
 
 #ifdef DEBUG
@@ -64,6 +64,7 @@ main(int argc, char *argv[]) {
     
   }
 
+  return 0;
 
   /**********************************************/
   /* Can we commit the writes to the server(s)? */

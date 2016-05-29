@@ -31,6 +31,8 @@
 #define MAXFILENAMELEN	128
 #define MAXBUFFERSIZE	512
 #define MAXMAXPATHLEN	128
+#define MAXWRITENUM		64
+#define MAXFILESIZE		1048576
 
 #define WAIT_TIMEOUT			3000
 #define RESEND_TIMEOUT			1000
@@ -136,5 +138,7 @@ bool isTimeout(struct timeval oldtime, long timeout);
 uint32_t genRandom();
 
 void print_header(pktHeader_t *pkt, bool recv);
+void print_writeBlk(pktWriteBlk_t *pkt, bool recv);
+void print_logentry(logEntry_t **slog);
 
 #endif /* NETWORK_H_ */

@@ -8,6 +8,7 @@
 #define CLIENT_H_
 
 #include <sys/time.h>
+#include <stdbool.h>
 
 enum {
   NormalReturn = 0,
@@ -46,6 +47,7 @@ int openfilereq();
 //void getPassTime(struct timeval *y, struct timeval *remain);
 
 void getRemainTime(struct timeval start, long int timeout, struct timeval *remain);
+bool ismyLogEmpty();
 
 #ifdef __cplusplus
 }

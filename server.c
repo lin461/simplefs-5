@@ -13,10 +13,11 @@ static int 	sport = 44054;
 static int 		sPacketLoss = -1;
 static uint32_t 	sSeqNum	= -1;
 static uint32_t	sGlobalID;
-static uint32_t	sTransNum;
+static uint32_t	sTransNum = 0;
 static char *sfilename = NULL;
 static char smountPath[MAXMAXPATHLEN];
 static uint32_t sfileid = -1;
+static logEntry_t *slog[MAXWRITENUM]; // array of pointers to struct entry
 
 
 /* ----------------------------------------------------------------------- */
@@ -81,6 +82,21 @@ void processPktInit(pktHeader_t *pkt) {
 }
 
 /* ----------------------------------------------------------------------- */
+bool isLogEmpty() {
+	if (slog == NULL) {
+		return true;
+	}
+	int i = 0;
+	for (; i < MAXWRITENUM; i++) {
+		if (slog[i] != NULL) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+/* ----------------------------------------------------------------------- */
 int processPktOpen(pktOpen_t *pkt) {
 	dbg_printf("== in processPktOpen====\n");
 	print_header(&pkt->header, true);
@@ -88,6 +104,10 @@ int processPktOpen(pktOpen_t *pkt) {
 	uint32_t cseq = ntohl(pkt->header.seqid);
 	uint32_t cgid = ntohl(pkt->header.gid);
 
+	if (!isLogEmpty()) {
+		dbg_printf("have opening file.\n");
+		return -1;
+	}
 	if (sfilename != NULL)
 		free(sfilename);
 	sfilename = NULL;
@@ -118,9 +138,61 @@ int processPktOpen(pktOpen_t *pkt) {
 		//TODO
 	}
 
+	// init slog
+
+	// init write number
+
+
+
 	return sfileid;
 }
 
+/* ----------------------------------------------------------------------- */
+int processWrite(pktWriteBlk_t *pkt) {
+//	print_header(&pkt->header, true);
+	print_writeBlk(pkt, true);
+	uint32_t fd = ntohl(pkt->fileid);
+	if (fd != sfileid) {
+		printf("not current open file.\n");
+		return -1;
+	}
+
+	uint32_t transnum = ntohl(pkt->transNum);
+	if (transnum != sTransNum) {
+		printf("not current transaction.\n");
+		return -1;
+	}
+
+	uint8_t writenum = pkt->writeNum;
+	if (writenum >= MAXWRITENUM) {
+		printf("Max write number!\n");
+		return -1;
+	}
+	uint16_t blocksize = ntohs(pkt->blocksize);
+	if (blocksize >= MAXBUFFERSIZE) {
+		printf("Max butter size!\n");
+		return -1;
+	}
+
+	uint32_t byteoffset = ntohl(pkt->offset);
+	if (byteoffset >= MAXFILESIZE) {
+		printf("Max file size!\n");
+		return -1;
+	}
+
+	// write to slog
+	logEntry_t* log = (logEntry_t*)calloc(1, sizeof(logEntry_t));
+	log->offset = byteoffset;
+	log->size = blocksize;
+	memcpy((char *) &log->buffer, &pkt->buffer, blocksize);
+	if (slog[writenum] != NULL) {
+		free(slog[writenum]);
+	}
+	slog[writenum] = log;
+
+//	print_logentry(slog);
+	return 0;
+}
 /* ----------------------------------------------------------------------- */
 
 int main(int argc, char *argv[]) {
@@ -167,6 +239,7 @@ int main(int argc, char *argv[]) {
 			case PKT_OPENACK:
 				break;
 			case PKT_WRITE:
+				processWrite(&pkt.writeblock);
 				break;
 			case PKT_COMMITREQ:
 				break;
