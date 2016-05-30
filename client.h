@@ -43,6 +43,9 @@ extern int CloseFile(int fd);
 int checkServers(int inputNumServers);
 int openfilereq();
 int commitreq(int fd);
+int commitPhase2(int fd);
+int aborting(int fd);
+//int processCommit(pktCommon_t *pkt);
 //int commitResend(pktCommitResend_t *pkt);
 
 //void getTimeDiff(struct timeval *x, struct timeval *y, struct timeval *diff);
@@ -50,6 +53,7 @@ int commitreq(int fd);
 
 void getRemainTime(struct timeval start, long int timeout, struct timeval *remain);
 bool ismyLogEmpty();
+void cleanupmylog();
 
 #ifdef __cplusplus
 }

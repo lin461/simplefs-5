@@ -74,6 +74,36 @@ main(int argc, char *argv[]) {
     return( ErrorExit );
   }
 
+
+  /**************************************/
+  /* Write incrementing numbers to the file AGAIN */
+  /**************************************/
+
+//  for ( loopCnt=0; loopCnt<128; loopCnt++ ) {
+  for ( loopCnt=0; loopCnt<2; loopCnt++ ) {
+    sprintf( strData, "%d\n", loopCnt + 10);
+
+#ifdef DEBUG
+    printf( "%d: Writing '%s' to file.\n", loopCnt, strData );
+#endif
+
+    if ( WriteBlock( fd, strData, byteOffset, strlen( strData ) ) < 0 ) {
+      printf( "Error writing to file %s [LoopCnt=%d]\n", fileName, loopCnt );
+      return( ErrorExit );
+    }
+    byteOffset += strlen( strData );
+
+  }
+
+  /**********************************************/
+  /* Can we commit the writes to the server(s)? */
+  /**********************************************/
+  if ( Abort( fd ) < 0 ) {
+    printf( "Could not commit changes to File '%s'\n", fileName );
+    return( ErrorExit );
+  }
+
+
   return 0;
 
   /**************************************/

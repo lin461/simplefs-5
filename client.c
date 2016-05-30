@@ -263,6 +263,12 @@ int Commit(int fd) {
 	/****************/
 	/* Commit Phase */
 	/****************/
+	commitPhase2(fd);
+
+	// clean up log
+	cleanupmylog();
+	myTransNum++;
+	myWriteNum = 0;
 
 	return (NormalReturn);
 
@@ -270,20 +276,39 @@ int Commit(int fd) {
 
 /* ------------------------------------------------------------------ */
 
-int
-Abort( int fd )
-{
-  ASSERT( fd >= 0 );
+int Abort(int fd) {
+	ASSERT(fd >= 0);
 
 #ifdef DEBUG
-  printf( "Abort: FD=%d\n", fd );
+	printf("Abort: FD=%d\n", fd);
 #endif
 
-  /*************************/
-  /* Abort the transaction */
-  /*************************/
+	if (myFileID == -1) {
+		RFError("No file opening now.\n");
+		return -1;
+	}
 
-  return(NormalReturn);
+	if (fd != myFileID) {
+		RFError("Invalid file handle.\n");
+		return -1;
+	}
+
+	if (ismyLogEmpty()) {
+		printf("No outstanding changes.\n");
+		return 0;
+	}
+
+	/*************************/
+	/* Abort the transaction */
+	/*************************/
+	aborting(fd);
+
+	// clean up log
+	cleanupmylog();
+	myTransNum++;
+	myWriteNum = 0;
+
+	return (NormalReturn);
 }
 
 /* ------------------------------------------------------------------ */
@@ -307,6 +332,132 @@ CloseFile( int fd ) {
   }
 
   return(NormalReturn);
+}
+
+/* ------------------------------------------------------------------ */
+int aborting(int fd) {
+	dbg_printf("\n\nStarting aborting.\n");
+	int res;
+	int currentServers = 0;
+	struct timeval startTime, sendTime;
+	pktGeneric_t pkt;
+	fd_set fdmask;
+
+	uint32_t serverids[myNumServers];
+	memset(serverids, 0, myNumServers);
+
+	// send out abort packet
+	pktCommon_t *p = (pktCommon_t *) alloca(sizeof(pktCommon_t));
+	p->header.gid = htonl(myGlobalID);
+	p->header.seqid = htonl(mySeqNum);
+	p->header.type = PKT_ABORT;
+	mySeqNum++;
+	p->fileid = htonl(myFileID);
+	p->transNum = htonl(myTransNum);
+
+	print_header(&p->header, false);
+	dbg_printf("file(%u)\t trans#(%u) \t\n", myFileID, myTransNum);
+
+	if (sendto(mySock, (void *) p, sizeof(pktCommon_t), 0,
+			(struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
+		RFError("SendOut fail\n");
+		// TODO how to deal with this
+		return ErrorReturn;
+	}
+
+	gettimeofday(&startTime, NULL);
+	gettimeofday(&sendTime, NULL);
+
+	int size = sizeof(Sockaddr);
+	while (1) {
+		FD_ZERO(&fdmask);
+		FD_SET(mySock, &fdmask);
+
+		if (currentServers == myNumServers) {
+			dbg_printf("have enough servers.\n");
+			return 0;
+		}
+		if (isTimeout(startTime, WAIT_TIMEOUT)) {
+			RFError(
+					"No enough servers. Abort truncate server number..");
+			// update current server number
+			myNumServers = currentServers;
+			return 0;
+		}
+		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
+			dbg_printf("timeout resend.\n");
+			print_header(&p->header, false);
+			dbg_printf("file(%u)\t trans#(%u) \t\n", myFileID, myTransNum);
+			if (sendto(mySock, (void *) p, sizeof(pktCommon_t), 0,
+					(struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
+				RFError("SendOut fail");
+				return ErrorReturn;
+			}
+			gettimeofday(&sendTime, NULL);
+		}
+
+		struct timeval remain;
+		getRemainTime(sendTime, RESEND_TIMEOUT_SEC, &remain);
+
+//		dbg_printf("... here time = %ld.%06ld \n", remain.tv_sec, remain.tv_usec);
+		if (select(32, &fdmask, NULL, NULL, &remain) <= 0) {
+			dbg_printf("continue from select.\n");
+			continue;
+		}
+
+		uint32_t rand = genRandom();
+
+		res = recvfrom(mySock, &pkt, sizeof(pkt), 0, NULL, NULL);
+		if (res <= 0) {
+			dbg_printf("continue from recvfrom.\n");
+			continue;
+		}
+		// drop packet
+		if ((rand % 100) < myPacketLoss) {
+			dbg_printf("packet dropped.\n");
+			continue;
+		}
+
+		uint32_t pktgid = ntohl(pkt.header.gid);
+		// process packet and update server number
+		if (pkt.header.type != PKT_ABORTACK || pktgid == myGlobalID) {
+			dbg_printf("skip Wrong type or mine\n");
+			continue;
+		}
+
+		pktCommon_t *precv = (pktCommon_t*) &pkt.common;
+
+		uint32_t pktfileid = ntohl(precv->fileid);
+		if (pktfileid != myFileID) {
+			dbg_printf("Not the same file I requested.\n");
+			continue;
+		}
+
+//		uint32_t transnum = ntohl(precv->transNum);
+//		if (transnum != myTransNum) {
+//			dbg_printf("Not the same Transaction Number.\n");
+//			continue;
+//		}
+
+		print_header(&precv->header, true);
+
+		// count current servers
+		uint32_t sgid = ntohl(precv->header.gid);
+		int i = 0;
+		for (; i < currentServers; i++) {
+			if (serverids[i] == sgid) {
+				dbg_printf("Duplicated\n");
+				break;
+			}
+		}
+		if (i == currentServers) {
+			serverids[i] = sgid;
+			currentServers++;
+		}
+		dbg_printf("currentServers=%d\n", currentServers);
+	}
+
+	return 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -413,7 +564,7 @@ int commitreq(int fd) {
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
 			dbg_printf("timeout resend.\n");
 			print_header(&p->header, false);
-			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
+//			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
 			dbg_printf("file(%u)\t trans#(%u) \t totalWrite#(%d)\n", myFileID, myTransNum, myWriteNum);
 			if (sendto(mySock, (void *) p, sizeof(pktCommitReq_t),
 					0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
@@ -464,11 +615,11 @@ int commitreq(int fd) {
 				continue;
 			}
 
-			uint32_t transnum = ntohl(precv->transNum);
-			if (transnum != myTransNum) {
-				dbg_printf("Not the same Transaction Number.\n");
-				continue;
-			}
+//			uint32_t transnum = ntohl(precv->transNum);
+//			if (transnum != myTransNum) {
+//				dbg_printf("Not the same Transaction Number.\n");
+//				continue;
+//			}
 
 			print_header(&precv->header, true);
 
@@ -496,14 +647,145 @@ int commitreq(int fd) {
 				continue;
 			}
 
-			uint32_t transnum = ntohl(precv->transNum);
-			if (transnum != myTransNum) {
-				dbg_printf("Not the same Transaction Number.\n");
-				continue;
-			}
+//			uint32_t transnum = ntohl(precv->transNum);
+//			if (transnum != myTransNum) {
+//				dbg_printf("Not the same Transaction Number.\n");
+//				continue;
+//			}
 
 			commitResend(precv);
 		}
+	}
+
+	return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/*
+ * Still consider success if currentNumberServers < myNumServers,
+ * and update myNumServers
+ */
+int commitPhase2(int fd) {
+	dbg_printf("\n\nStarting commitPhase2.\n");
+	int res;
+	int currentServers = 0;
+	struct timeval startTime, sendTime;
+	pktGeneric_t pkt;
+	fd_set fdmask;
+
+	uint32_t serverids[myNumServers];
+	memset(serverids, 0, myNumServers);
+
+	// send out commit packet
+	pktCommon_t *p = (pktCommon_t *)alloca(sizeof(pktCommon_t));
+	p->header.gid = htonl(myGlobalID);
+	p->header.seqid = htonl(mySeqNum);
+	p->header.type = PKT_COMMIT;
+	mySeqNum++;
+	p->fileid = htonl(myFileID);
+	p->transNum = htonl(myTransNum);
+
+	print_header(&p->header, false);
+	dbg_printf("file(%u)\t trans#(%u) \t\n", myFileID, myTransNum);
+
+	if (sendto(mySock, (void *) p, sizeof(pktCommon_t),
+			0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
+		RFError("SendOut fail\n");
+		// TODO how to deal with this
+		return ErrorReturn;
+	}
+
+	gettimeofday (&startTime, NULL);
+	gettimeofday (&sendTime, NULL);
+
+	int size = sizeof(Sockaddr);
+	while (1) {
+		FD_ZERO(&fdmask);
+		FD_SET(mySock, &fdmask);
+
+		if (currentServers == myNumServers) {
+			dbg_printf("have enough servers.\n");
+			return 0;
+		}
+		if (isTimeout(startTime, WAIT_TIMEOUT)) {
+			RFError("No enough servers. Commit 2st phase truncate server number..");
+			// update current server number
+			myNumServers = currentServers;
+			return 0;
+		}
+		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
+			dbg_printf("timeout resend.\n");
+			print_header(&p->header, false);
+//			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
+			dbg_printf("file(%u)\t trans#(%u) \t\n", myFileID, myTransNum);
+			if (sendto(mySock, (void *) p, sizeof(pktCommon_t),
+					0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
+				RFError("SendOut fail");
+				// TODO how to deal with this
+				return ErrorReturn;
+			}
+			gettimeofday (&sendTime, NULL);
+		}
+
+		struct timeval remain;
+		getRemainTime(sendTime, RESEND_TIMEOUT_SEC, &remain);
+
+//		dbg_printf("... here time = %ld.%06ld \n", remain.tv_sec, remain.tv_usec);
+		if (select(32, &fdmask, NULL, NULL, &remain) <= 0) {
+			dbg_printf("continue from select.\n");
+			continue;
+		}
+
+		uint32_t rand = genRandom();
+
+		res = recvfrom(mySock, &pkt, sizeof(pkt), 0, NULL, NULL);
+		if (res <= 0) {
+			dbg_printf("continue from recvfrom.\n");
+			continue;
+		}
+		// drop packet
+		if ((rand % 100) < myPacketLoss) {
+			dbg_printf("packet dropped.\n");
+			continue;
+		}
+
+		uint32_t pktgid = ntohl(pkt.header.gid);
+		// process packet and update server number
+		if (pkt.header.type != PKT_COMMITACK || pktgid == myGlobalID) {
+			dbg_printf("skip Wrong type or mine\n");
+			continue;
+		}
+
+		pktCommon_t *precv = (pktCommon_t*)&pkt.common;
+
+		uint32_t pktfileid = ntohl(precv->fileid);
+		if (pktfileid != myFileID) {
+			dbg_printf("Not the same file I requested.\n");
+			continue;
+		}
+
+//		uint32_t transnum = ntohl(precv->transNum);
+//		if (transnum != myTransNum) {
+//			dbg_printf("Not the same Transaction Number.\n");
+//			continue;
+//		}
+
+		print_header(&precv->header, true);
+
+		// count current servers
+		uint32_t sgid = ntohl(precv->header.gid);
+		int i = 0;
+		for(; i < currentServers; i++) {
+			if (serverids[i] == sgid) {
+				dbg_printf("Duplicated\n");
+				break;
+			}
+		}
+		if (i == currentServers) {
+			serverids[i] = sgid;
+			currentServers++;
+		}
+		dbg_printf("currentServers=%d\n", currentServers);
 	}
 
 	return 0;
@@ -566,7 +848,7 @@ int openfilereq() {
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
 			dbg_printf("timeout resend.\n");
 			print_header(&p->header, false);
-			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
+//			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
 			if (sendto(mySock, (void *) p, sizeof(pktOpen_t),
 					0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 				RFError("SendOut fail");
@@ -686,7 +968,7 @@ int checkServers(int inputNumServers) {
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
 			dbg_printf("timeout resend.\n");
 			print_header(p, false);
-			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
+//			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
 			if (sendto(mySock, (void *) p, sizeof(pktHeader_t),
 					0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 				RFError("SendOut fail");
@@ -790,4 +1072,20 @@ bool ismyLogEmpty() {
 	}
 
 	return true;
+}
+
+/* ------------------------------------------------------------------ */
+void cleanupmylog() {
+	if (myLogs == NULL) {
+		return;
+	}
+
+	int i;
+	for (i = 0; i < MAXWRITENUM; i++) {
+		if (myLogs[i] != NULL) {
+			free(myLogs[i]);
+			myLogs[i] = NULL;
+		}
+	}
+	return;
 }

@@ -5,6 +5,9 @@
  *      Author: gy
  */
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "network.h"
 
 static int	ssock = -1;
@@ -96,6 +99,22 @@ bool isLogEmpty() {
 	return true;
 }
 
+/* ------------------------------------------------------------------ */
+void cleanuplog() {
+	if (slog == NULL) {
+		return;
+	}
+
+	int i;
+	for (i = 0; i < MAXWRITENUM; i++) {
+		if (slog[i] != NULL) {
+			free(slog[i]);
+			slog[i] = NULL;
+		}
+	}
+	return;
+}
+
 /* ----------------------------------------------------------------------- */
 int processPktOpen(pktOpen_t *pkt) {
 	dbg_printf("== in processPktOpen====\n");
@@ -131,6 +150,7 @@ int processPktOpen(pktOpen_t *pkt) {
 	p->fileid = htonl(sfileid);
 
 	print_header(&p->header, false);
+	dbg_printf("current file id = %u\n", sfileid);
 
 	if (sendto(ssock, (void *) p, sizeof(pktOpenACK_t),
 			0, (struct sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
@@ -157,11 +177,11 @@ int processWrite(pktWriteBlk_t *pkt) {
 		return -1;
 	}
 
-	uint32_t transnum = ntohl(pkt->transNum);
-	if (transnum != sTransNum) {
-		printf("not current transaction.\n");
-		return -1;
-	}
+//	uint32_t transnum = ntohl(pkt->transNum);
+//	if (transnum != sTransNum) {
+//		printf("not current transaction.\n");
+//		return -1;
+//	}
 
 	uint8_t writenum = pkt->writeNum;
 	if (writenum >= MAXWRITENUM) {
@@ -194,42 +214,132 @@ int processWrite(pktWriteBlk_t *pkt) {
 	return 0;
 }
 /* ----------------------------------------------------------------------- */
-//int processCommit(pktCommitReq_t *pkt){
-//	char *fullfilename;
-//	dbg_printf("== in processPktOpen====\n");
-//	print_header(&pkt->header, true);
-//
-//	uint32_t cseq = ntohl(pkt->header.seqid);
-//	uint32_t cgid = ntohl(pkt->header.gid);
-//
-//	if (ntohl(pkt->fileid) != sfileid) {
-//		printf("not current open file.\n");
-//		return -1;
-//	}
-//
+int processAbort(pktCommon_t *pkt){
+	int res;
+	dbg_printf("== in processAbort ====\n");
+	print_header(&pkt->header, true);
+
+	uint32_t cseq = ntohl(pkt->header.seqid);
+	uint32_t cgid = ntohl(pkt->header.gid);
+
+	if (ntohl(pkt->fileid) != sfileid) {
+		printf("not current open file.\n");
+		return -1;
+	}
+
 //	uint32_t transnum = ntohl(pkt->transNum);
 //	if (transnum != sTransNum) {
 //		printf("not current transaction.\n");
 //		return -1;
 //	}
-//
-//	int namelen = strlen(smountPath) + strlen(sfilename) + 2;
-//	fullfilename = (char *)calloc(namelen);
-//	if (fullfilename == NULL) {
-//		RFError("No memory,\n");
+
+	// clean up log
+	cleanuplog();
+
+	// send out abortAck packet
+	pktCommon_t *p = (pktCommon_t*)alloca(sizeof(pktCommon_t));
+	p->header.gid = htonl(sGlobalID);
+	p->header.seqid = htonl(sSeqNum);
+	sSeqNum++;
+	p->header.type = PKT_ABORTACK;
+
+	p->fileid = htonl(sfileid);
+	p->transNum = htonl(sTransNum);
+
+	print_header(&p->header, false);
+	dbg_printf("current file id = %u, trans# = %u\n", sfileid, sTransNum);
+
+	if (sendto(ssock, (void *) p, sizeof(pktCommon_t),
+			0, (struct sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
+		RFError("SendOut fail\n");
+	}
+
+	return 0;
+}
+
+/* ----------------------------------------------------------------------- */
+int processCommit(pktCommon_t *pkt){
+	char *fullfilename;
+	int res;
+	dbg_printf("== in processCommit ====\n");
+	print_header(&pkt->header, true);
+
+	uint32_t cseq = ntohl(pkt->header.seqid);
+	uint32_t cgid = ntohl(pkt->header.gid);
+
+	if (ntohl(pkt->fileid) != sfileid) {
+		printf("not current open file.\n");
+		return -1;
+	}
+
+//	uint32_t transnum = ntohl(pkt->transNum);
+//	if (transnum != sTransNum) {
+//		printf("not current transaction.\n");
 //		return -1;
 //	}
-//	snprintf(fullfilename, namelen, "%s/%s. smountPath, sfilename");
-//	fullfilename[namelen - 1] = '\0';
-//
-//	int fd = open(fullfilename, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
-//	if (fd < 0) {
-//		free(fullfilename);
-//		return -1;
-//	}
-//
-//
-//}
+
+	int namelen = strlen(smountPath) + strlen(sfilename) + 2;
+	fullfilename = (char *)calloc(namelen, sizeof(char));
+	if (fullfilename == NULL) {
+		RFError("No memory,\n");
+		return -1;
+	}
+	snprintf(fullfilename, namelen, "%s/%s", smountPath, sfilename);
+	fullfilename[namelen - 1] = '\0';
+
+	int fd = open(fullfilename, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
+	if (fd < 0) {
+		free(fullfilename);
+		return -1;
+	}
+
+	// write log to file
+	int i;
+	for (i = 0; i < MAXWRITENUM; i++) {
+		if (slog[i] == NULL) {
+			continue;
+		}
+		if (lseek(fd, slog[i]->offset, SEEK_SET) < 0) {
+			RFError("WriteBlock Seek");
+			close(fd);
+			free(fullfilename);
+			return -1;
+		}
+
+		if ((res = write(fd, slog[i]->buffer, slog[i]->size)) < 0) {
+			perror("WriteBlock write");
+			close(fd);
+			free(fullfilename);
+			return -1;
+		}
+	}
+
+	cleanuplog();
+
+	// send out commitAck packet
+	pktCommon_t *p = (pktCommon_t*)alloca(sizeof(pktCommon_t));
+	p->header.gid = htonl(sGlobalID);
+	p->header.seqid = htonl(sSeqNum);
+	sSeqNum++;
+	p->header.type = PKT_COMMITACK;
+
+	p->fileid = htonl(sfileid);
+	p->transNum = htonl(sTransNum);
+
+	print_header(&p->header, false);
+	dbg_printf("current file id = %u, trans# = %u\n", sfileid, sTransNum);
+
+	if (sendto(ssock, (void *) p, sizeof(pktCommon_t),
+			0, (struct sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
+		RFError("SendOut fail\n");
+	}
+
+	close(fd);
+	free(fullfilename);
+
+
+	return 0;
+}
 
 /* ----------------------------------------------------------------------- */
 int processCommitReq(pktCommitReq_t *pkt){
@@ -246,11 +356,11 @@ int processCommitReq(pktCommitReq_t *pkt){
 		return -1;
 	}
 
-	uint32_t transnum = ntohl(pkt->transNum);
-	if (transnum != sTransNum) {
-		printf("not current transaction.\n");
-		return -1;
-	}
+//	uint32_t transnum = ntohl(pkt->transNum);
+//	if (transnum != sTransNum) {
+//		printf("not current transaction.\n");
+//		return -1;
+//	}
 
 	uint8_t totalwritenumber = pkt->totalWriteNum;
 	int i;
@@ -364,10 +474,12 @@ int main(int argc, char *argv[]) {
 			case PKT_COMMITRESEND:
 				break;
 			case PKT_COMMIT:
+				processCommit(&pkt.common);
 				break;
 			case PKT_COMMITACK:
 				break;
 			case PKT_ABORT:
+				processAbort(&pkt.common);
 				break;
 			case PKT_ABORTACK:
 				break;
