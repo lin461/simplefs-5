@@ -421,13 +421,19 @@ int processCommitReq(pktCommitReq_t *pkt){
 /* ----------------------------------------------------------------------- */
 
 int main(int argc, char *argv[]) {
+	if (argc != 7) {
+		return -1;
+	}
+
+	if ((strcmp("-port", argv[1]) |  strcmp("-mount", argv[3]) | strcmp("-drop", argv[5])) != 0)
+		return -1;
+
 	int size = sizeof(Sockaddr);
 	char mountpath[MAXMAXPATHLEN];
 
-//	sport = atoi(argv[1]);
-//	strncpy(mountpath, argv[2], MAXMAXPATHLEN);
-	strncpy(mountpath, argv[1], MAXMAXPATHLEN);
-	int drop = atoi(argv[2]);
+	sport = atoi(argv[2]);
+	strncpy(mountpath, argv[4], MAXMAXPATHLEN);
+	int drop = atoi(argv[6]);
 
 	if (initServer(sport, mountpath, drop) < 0) {
 		RFError("InitServer fail.");

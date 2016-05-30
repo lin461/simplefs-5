@@ -313,25 +313,35 @@ int Abort(int fd) {
 
 /* ------------------------------------------------------------------ */
 
-int
-CloseFile( int fd ) {
+int CloseFile(int fd) {
 
-  ASSERT( fd >= 0 );
+	ASSERT(fd >= 0);
 
 #ifdef DEBUG
-  printf( "Close: FD=%d\n", fd );
+	printf("Close: FD=%d\n", fd);
 #endif
 
 	/*****************************/
 	/* Check for Commit or Abort */
 	/*****************************/
 
-  if ( close( fd ) < 0 ) {
-    perror("Close");
-    return(ErrorReturn);
-  }
+//  if ( close( fd ) < 0 ) {
+//    perror("Close");
+//    return(ErrorReturn);
+//  }
 
-  return(NormalReturn);
+	Commit(fd);
+
+	// close file
+	if (myFilename != NULL) {
+		free(myFilename);
+		myFilename = NULL;
+	}
+	myFileID = -1;
+	myTransNum = 0;
+	myWriteNum = 0;
+
+	return (NormalReturn);
 }
 
 /* ------------------------------------------------------------------ */

@@ -104,8 +104,6 @@ main(int argc, char *argv[]) {
   }
 
 
-  return 0;
-
   /**************************************/
   /* Close the writes to the server(s) */
   /**************************************/
