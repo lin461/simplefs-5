@@ -140,5 +140,6 @@ uint32_t genRandom();
 void print_header(pktHeader_t *pkt, bool recv);
 void print_writeBlk(pktWriteBlk_t *pkt, bool recv);
 void print_logentry(logEntry_t **slog);
+void print_servers(uint32_t *servers, int num);
 
 #endif /* NETWORK_H_ */

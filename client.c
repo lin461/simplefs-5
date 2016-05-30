@@ -91,7 +91,6 @@ InitReplFs( unsigned short portNum, int packetLoss, int numServers ) {
 //  	}
 
   	if (checkServers(numServers) < 0) {
-  		RFError("check servers Fail.");
   		return ErrorReturn;
   	}
 
@@ -395,6 +394,7 @@ int aborting(int fd) {
 					"No enough servers. Abort truncate server number..");
 			// update current server number
 			myNumServers = currentServers;
+			print_servers(serverids, myNumServers);
 			return 0;
 		}
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
@@ -572,6 +572,7 @@ int commitreq(int fd) {
 			RFError("No enough servers. Commit 1st phase truncate server number..");
 			// update current server number
 			myNumServers = currentServers;
+			print_servers(serverids, myNumServers);
 			return 0;
 		}
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
@@ -724,6 +725,7 @@ int commitPhase2(int fd) {
 			RFError("No enough servers. Commit 2st phase truncate server number..");
 			// update current server number
 			myNumServers = currentServers;
+			print_servers(serverids, myNumServers);
 			return 0;
 		}
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
@@ -975,7 +977,7 @@ int checkServers(int inputNumServers) {
 			return 0;
 		}
 		if (isTimeout(startTime, WAIT_TIMEOUT)) {
-			RFError("No enough servers.");
+			printf("Init: No enough servers (%d).", currentServers);
 			return -1;
 		}
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend

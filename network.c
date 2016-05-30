@@ -220,6 +220,15 @@ void print_logentry(logEntry_t **slog) {
 	dbg_printf(" ================== END ======================== \n");
 }
 
+void print_servers(uint32_t *servers, int num) {
+	int i;
+	for (i = 0; i < num; i++) {
+		if (servers[i] != 0) {
+			printf("[%d]%u\n", i, servers[i]);
+		}
+	}
+}
+
 /* ----------------------------------------------------------------------- */
 uint32_t genRandom() {
 	  struct timeval	now;
