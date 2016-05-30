@@ -112,7 +112,7 @@ init(void)
   signal(SIGCLD, SIG_IGN);
   /* Max 180 seconds to run test */
   /* Reduced to 15 sec, not sure if this is right. */
-  alarm(100);
+  alarm(30);
   /* Exit if we time out and get a SIGALRM */
   signal(SIGALRM, exit);
 }
@@ -300,38 +300,38 @@ appl8() {
     int i;
     char commitStrBuf[512];
 
-    for( i = 0; i < 512; i++ )
+    for( i = 0; i < 15; i++ )
         commitStrBuf[i] = '1';
 
     fd = openFile( "file8" );
 
     // write first transaction starting at offset 512
-    for (i = 0; i < 50; i++)
-        retVal = WriteBlock( fd, commitStrBuf, 512 + i * 512 , 512 );
+    for (i = 0; i < 2; i++)
+        retVal = WriteBlock( fd, commitStrBuf, 15 + i * 15 , 15 );
 
     retVal = commit( fd );
     retVal = closeFile( fd );
 
-    for( i = 0; i < 512; i++ )
+    for( i = 0; i < 15; i++ )
         commitStrBuf[i] = '2';
 
     fd = openFile( "file8" );
 
     // write second transaction starting at offset 0
-    retVal = WriteBlock( fd, commitStrBuf, 0 , 512 );
+    retVal = WriteBlock( fd, commitStrBuf, 0 , 15 );
 
     retVal = commit( fd );
     retVal = closeFile( fd );
 
 
-    for( i = 0; i < 512; i++ )
+    for( i = 0; i < 15; i++ )
         commitStrBuf[i] = '3';
 
     fd = openFile( "file8" );
 
     // write third transaction starting at offset 50*512
-    for (i = 0; i < 50; i++)
-        retVal = WriteBlock( fd, commitStrBuf, 50 * 512 + i * 512 , 512 );
+    for (i = 0; i < 1; i++)
+        retVal = WriteBlock( fd, commitStrBuf, 2 * 15 + i * 15 , 15 );
 
     retVal = commit( fd );
     retVal = closeFile( fd );
@@ -362,7 +362,7 @@ static appl10() {
     fd = openFile( "file10" );
 
     // zero out the file first
-    for (i = 0; i < 50; i++)
+    for (i = 0; i < 100; i++)
         retVal = WriteBlock( fd, commitStrBuf, i * 256 , 256 );
 
     retVal = commit( fd );

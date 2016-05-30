@@ -189,7 +189,7 @@ int processWrite(pktWriteBlk_t *pkt) {
 		return -1;
 	}
 	uint16_t blocksize = ntohs(pkt->blocksize);
-	if (blocksize >= MAXBUFFERSIZE) {
+	if (blocksize > MAXBUFFERSIZE) {
 		printf("Max butter size!\n");
 		return -1;
 	}

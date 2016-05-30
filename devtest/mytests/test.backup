@@ -112,7 +112,7 @@ init(void)
   signal(SIGCLD, SIG_IGN);
   /* Max 180 seconds to run test */
   /* Reduced to 15 sec, not sure if this is right. */
-  alarm(100);
+  alarm(30);
   /* Exit if we time out and get a SIGALRM */
   signal(SIGALRM, exit);
 }
@@ -362,7 +362,7 @@ static appl10() {
     fd = openFile( "file10" );
 
     // zero out the file first
-    for (i = 0; i < 50; i++)
+    for (i = 0; i < 100; i++)
         retVal = WriteBlock( fd, commitStrBuf, i * 256 , 256 );
 
     retVal = commit( fd );

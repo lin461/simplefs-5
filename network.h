@@ -9,7 +9,7 @@
 #define NETWORK_H_
 
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define dbg_printf(...) printf(__VA_ARGS__)
@@ -34,7 +34,7 @@
 #define MAXWRITENUM		64
 #define MAXFILESIZE		1048576
 
-#define WAIT_TIMEOUT			3000
+#define WAIT_TIMEOUT			5000
 #define RESEND_TIMEOUT			1000
 #define RESEND_TIMEOUT_SEC		1
 

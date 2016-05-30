@@ -111,7 +111,10 @@ int OpenFile(char * fileName) {
 #ifdef DEBUG
 	printf("\n\nOpenFile: Opening File '%s'\n", fileName);
 #endif
-
+    // If this file is already opened
+    if ((myFilename != NULL) && strcmp(fileName, myFilename) == 0) {
+        return myFileID;
+    }
 	// check if has opening file
 	if (myFileID != -1 || myFilename != NULL || !ismyLogEmpty()) {
 		RFError("Has file opened.");
@@ -1051,8 +1054,8 @@ void getRemainTime(struct timeval start, long int timeout, struct timeval *remai
 	}
 
 	struct timeval to;
-	to.tv_sec = timeout;
-	to.tv_usec = 0;
+	to.tv_sec = 0;
+	to.tv_usec = 500000;
 
 	remain->tv_sec = to.tv_sec - diff.tv_sec;
 	remain->tv_usec = to.tv_usec - diff.tv_usec;
