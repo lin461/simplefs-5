@@ -27,7 +27,7 @@ static	int		mySock = -1;
 static Sockaddr	*myAddr = NULL;
 
 
-static uint32_t 	myTransNum = 0;
+static uint32_t 	myTransNum = -1;
 static uint8_t		myWriteNum = -1;
 static uint32_t 	myFileID = -1;
 static int 		myNumServers = -1;
@@ -70,6 +70,7 @@ InitReplFs( unsigned short portNum, int packetLoss, int numServers ) {
 	myNumServers = numServers;
 	mySeqNum = 0;
 	myGlobalID = genRandom();
+	myTransNum = 0;
 
 
 	dbg_printf("addr = %p\n", &mySock);
@@ -195,7 +196,13 @@ int WriteBlock(int fd, char * buffer, int byteOffset, int blockSize) {
 //	print_header(&p->header, false);
 	print_writeBlk(p, false);
 
-	int res = sendto(mySock, (void *) p, sizeof(pktOpen_t),
+	//// For resend testing
+//	if (myWriteNum == 2) {
+//		myWriteNum++;
+//		return blockSize;
+//	}
+
+	int res = sendto(mySock, (void *) p, sizeof(pktWriteBlk_t),
 			0, (struct sockaddr *) myAddr, sizeof(Sockaddr));
 	if (res <= 0) {
 		RFError("SendOut fail\n");
@@ -220,30 +227,44 @@ int WriteBlock(int fd, char * buffer, int byteOffset, int blockSize) {
 //	return (bytesWritten);
 
 //	print_logentry(myLogs);
-	return res;
+	return blockSize;
 
 }
 
 /* ------------------------------------------------------------------ */
 
-int
-Commit( int fd ) {
-  ASSERT( fd >= 0 );
+int Commit(int fd) {
+	ASSERT(fd >= 0);
 
 #ifdef DEBUG
-  printf( "Commit: FD=%d\n", fd );
+	printf("Commit: FD=%d\n", fd);
 #endif
 
+	if (myFileID == -1) {
+		RFError("No file opening now.\n");
+		return -1;
+	}
+
+	if (fd != myFileID) {
+		RFError("Invalid file handle.\n");
+		return -1;
+	}
+
+	if (ismyLogEmpty()) {
+		printf("No outstanding changes.\n");
+		return 0;
+	}
 	/****************************************************/
 	/* Prepare to Commit Phase			    */
 	/* - Check that all writes made it to the server(s) */
 	/****************************************************/
+	commitreq(fd);
 
 	/****************/
 	/* Commit Phase */
 	/****************/
 
-  return( NormalReturn );
+	return (NormalReturn);
 
 }
 
@@ -289,6 +310,207 @@ CloseFile( int fd ) {
 }
 
 /* ------------------------------------------------------------------ */
+int commitResend(pktCommitResend_t *pkt) {
+	uint32_t writebitmap[2];
+	writebitmap[0] = ntohl(pkt->L_writeNumReq);
+	writebitmap[1] = ntohl(pkt->H_writeNumReq);
+	int i, j;
+	for (i = 0; i < 2; i++) {
+		for (j = 0; j < 32; j++) {
+			int bit = (writebitmap[i] >> j) & 1;
+			if (bit == 0) {
+				continue;
+			}
+			uint8_t index = i * 32 + j;
+			if (myLogs[index] == NULL) {
+				continue;
+			}
+			logEntry_t* log = myLogs[index];
+			// write to packet
+			pktWriteBlk_t *p = (pktWriteBlk_t *) alloca(sizeof(pktWriteBlk_t));
+			p->header.gid = htonl(myGlobalID);
+			p->header.seqid = htonl(mySeqNum);
+			p->header.type = PKT_WRITE;
+			mySeqNum++;
+			strncpy((char *) p->buffer, log->buffer, log->size);
+			p->fileid = htonl(myFileID);
+			p->blocksize = htons(log->size);
+			p->offset = htonl(log->offset);
+			p->transNum = htonl(myTransNum);
+			p->writeNum = index;;
+
+		//	print_header(&p->header, false);
+			print_writeBlk(p, false);
+
+			int res = sendto(mySock, (void *) p, sizeof(pktWriteBlk_t),
+					0, (struct sockaddr *) myAddr, sizeof(Sockaddr));
+			if (res <= 0) {
+				RFError("SendOut fail\n");
+				// TODO how to deal with this
+				return ErrorReturn;
+			}
+		}
+	}
+
+	return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/*
+ * Still consider success if currentNumberServers < myNumServers,
+ * and update myNumServers
+ */
+int commitreq(int fd) {
+	dbg_printf("\n\nStarting commitreq.\n");
+	int res;
+	int currentServers = 0;
+	struct timeval startTime, sendTime;
+	pktGeneric_t pkt;
+	fd_set fdmask;
+
+	uint32_t serverids[myNumServers];
+	memset(serverids, 0, myNumServers);
+
+	// send out commitreq packet
+	pktCommitReq_t *p = (pktCommitReq_t *)alloca(sizeof(pktCommitReq_t));
+	p->header.gid = htonl(myGlobalID);
+	p->header.seqid = htonl(mySeqNum);
+	p->header.type = PKT_COMMITREQ;
+	mySeqNum++;
+	p->fileid = htonl(myFileID);
+	p->totalWriteNum = myWriteNum; // how many writes.
+	p->transNum = htonl(myTransNum);
+
+	print_header(&p->header, false);
+	dbg_printf("file(%u)\t trans#(%u) \t totalWrite#(%d)\n", myFileID, myTransNum, myWriteNum);
+
+	if (sendto(mySock, (void *) p, sizeof(pktCommitReq_t),
+			0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
+		RFError("SendOut fail\n");
+		// TODO how to deal with this
+		return ErrorReturn;
+	}
+
+	gettimeofday (&startTime, NULL);
+	gettimeofday (&sendTime, NULL);
+
+	int size = sizeof(Sockaddr);
+	while (1) {
+//		dbg_printf("in while...\n");
+		FD_ZERO(&fdmask);
+		FD_SET(mySock, &fdmask);
+
+		if (currentServers == myNumServers) {
+			dbg_printf("have enough servers.\n");
+			return 0;
+		}
+		if (isTimeout(startTime, WAIT_TIMEOUT)) {
+			RFError("No enough servers. Commit 1st phase truncate server number..");
+			// update current server number
+			myNumServers = currentServers;
+			return 0;
+		}
+		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
+			dbg_printf("timeout resend.\n");
+			print_header(&p->header, false);
+			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
+			dbg_printf("file(%u)\t trans#(%u) \t totalWrite#(%d)\n", myFileID, myTransNum, myWriteNum);
+			if (sendto(mySock, (void *) p, sizeof(pktCommitReq_t),
+					0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
+				RFError("SendOut fail");
+				// TODO how to deal with this
+				return ErrorReturn;
+			}
+			gettimeofday (&sendTime, NULL);
+		}
+
+		struct timeval remain;
+		getRemainTime(sendTime, RESEND_TIMEOUT_SEC, &remain);
+
+//		dbg_printf("... here time = %ld.%06ld \n", remain.tv_sec, remain.tv_usec);
+		if (select(32, &fdmask, NULL, NULL, &remain) <= 0) {
+			dbg_printf("continue from select.\n");
+			continue;
+		}
+
+		uint32_t rand = genRandom();
+
+		res = recvfrom(mySock, &pkt, sizeof(pkt), 0, NULL, NULL);
+		if (res <= 0) {
+			dbg_printf("continue from recvfrom.\n");
+			continue;
+		}
+		// drop packet
+		if ((rand % 100) < myPacketLoss) {
+			dbg_printf("packet dropped.\n");
+			continue;
+		}
+
+		uint32_t pktgid = ntohl(pkt.header.gid);
+		// process packet and update server number
+		if (pktgid == myGlobalID) {
+			dbg_printf("Drop self packet\n");
+			continue;
+		}
+
+		uint8_t type = pkt.header.type;
+		if (type == PKT_COMMITYES) {
+			dbg_printf("receive COMMIT YES packet.\n");
+			pktCommon_t *precv = (pktCommon_t*)&pkt.common;
+
+			uint32_t pktfileid = ntohl(precv->fileid);
+			if (pktfileid != myFileID) {
+				dbg_printf("Not the same file I requested.\n");
+				continue;
+			}
+
+			uint32_t transnum = ntohl(precv->transNum);
+			if (transnum != myTransNum) {
+				dbg_printf("Not the same Transaction Number.\n");
+				continue;
+			}
+
+			print_header(&precv->header, true);
+
+			// count current servers
+			uint32_t sgid = ntohl(precv->header.gid);
+			int i = 0;
+			for(; i < currentServers; i++) {
+				if (serverids[i] == sgid) {
+					dbg_printf("Duplicated\n");
+					break;
+				}
+			}
+			if (i == currentServers) {
+				serverids[i] = sgid;
+				currentServers++;
+			}
+			dbg_printf("currentServers=%d\n", currentServers);
+		} else if (type == PKT_COMMITRESEND) {
+			dbg_printf("receive COMMIT RESEND packet.\n");
+			pktCommitResend_t *precv = (pktCommitResend_t*)&pkt.commitresend;
+
+			uint32_t pktfileid = ntohl(precv->fileid);
+			if (pktfileid != myFileID) {
+				dbg_printf("Not the same file I requested.\n");
+				continue;
+			}
+
+			uint32_t transnum = ntohl(precv->transNum);
+			if (transnum != myTransNum) {
+				dbg_printf("Not the same Transaction Number.\n");
+				continue;
+			}
+
+			commitResend(precv);
+		}
+	}
+
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------ */
 int openfilereq() {
 	dbg_printf("Starting openfile.\n");
 	int res;
@@ -324,7 +546,7 @@ int openfilereq() {
 	int size = sizeof(Sockaddr);
 
 	while (1) {
-		dbg_printf("in while...\n");
+//		dbg_printf("in while...\n");
 		FD_ZERO(&fdmask);
 		FD_SET(mySock, &fdmask);
 

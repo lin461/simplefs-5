@@ -49,7 +49,7 @@ main(int argc, char *argv[]) {
   /**************************************/
 
 //  for ( loopCnt=0; loopCnt<128; loopCnt++ ) {
-  for ( loopCnt=0; loopCnt<5; loopCnt++ ) {
+  for ( loopCnt=0; loopCnt<3; loopCnt++ ) {
     sprintf( strData, "%d\n", loopCnt );
 
 #ifdef DEBUG
@@ -64,7 +64,7 @@ main(int argc, char *argv[]) {
     
   }
 
-  return 0;
+
 
   /**********************************************/
   /* Can we commit the writes to the server(s)? */
@@ -73,6 +73,8 @@ main(int argc, char *argv[]) {
     printf( "Could not commit changes to File '%s'\n", fileName );
     return( ErrorExit );
   }
+
+  return 0;
 
   /**************************************/
   /* Close the writes to the server(s) */

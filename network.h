@@ -108,7 +108,7 @@ typedef struct CommitRePkt {
 	uint32_t transNum;
 	uint32_t H_writeNumReq;
 	uint32_t L_writeNumReq;
-} pktCommitRe_t;
+} pktCommitResend_t;
 
 typedef union GenericPkt {
 	pktHeader_t header;
@@ -118,7 +118,7 @@ typedef union GenericPkt {
 	pktCommitReq_t	commitreq;
 	pktCommon_t		common;
 	pktCommitAbort_t commitabort;
-	pktCommitRe_t	commitre;
+	pktCommitResend_t	commitresend;
 } pktGeneric_t;
 
 

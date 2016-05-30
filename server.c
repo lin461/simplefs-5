@@ -194,6 +194,121 @@ int processWrite(pktWriteBlk_t *pkt) {
 	return 0;
 }
 /* ----------------------------------------------------------------------- */
+//int processCommit(pktCommitReq_t *pkt){
+//	char *fullfilename;
+//	dbg_printf("== in processPktOpen====\n");
+//	print_header(&pkt->header, true);
+//
+//	uint32_t cseq = ntohl(pkt->header.seqid);
+//	uint32_t cgid = ntohl(pkt->header.gid);
+//
+//	if (ntohl(pkt->fileid) != sfileid) {
+//		printf("not current open file.\n");
+//		return -1;
+//	}
+//
+//	uint32_t transnum = ntohl(pkt->transNum);
+//	if (transnum != sTransNum) {
+//		printf("not current transaction.\n");
+//		return -1;
+//	}
+//
+//	int namelen = strlen(smountPath) + strlen(sfilename) + 2;
+//	fullfilename = (char *)calloc(namelen);
+//	if (fullfilename == NULL) {
+//		RFError("No memory,\n");
+//		return -1;
+//	}
+//	snprintf(fullfilename, namelen, "%s/%s. smountPath, sfilename");
+//	fullfilename[namelen - 1] = '\0';
+//
+//	int fd = open(fullfilename, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
+//	if (fd < 0) {
+//		free(fullfilename);
+//		return -1;
+//	}
+//
+//
+//}
+
+/* ----------------------------------------------------------------------- */
+int processCommitReq(pktCommitReq_t *pkt){
+	dbg_printf("== in processCommitReq====\n");
+	print_logentry(slog);
+	print_header(&pkt->header, true);
+	uint32_t h_resendwrite = 0, l_resendwrite = 0;
+
+	uint32_t cseq = ntohl(pkt->header.seqid);
+	uint32_t cgid = ntohl(pkt->header.gid);
+
+	if (ntohl(pkt->fileid) != sfileid) {
+		printf("not current open file.\n");
+		return -1;
+	}
+
+	uint32_t transnum = ntohl(pkt->transNum);
+	if (transnum != sTransNum) {
+		printf("not current transaction.\n");
+		return -1;
+	}
+
+	uint8_t totalwritenumber = pkt->totalWriteNum;
+	int i;
+	for (i = 0; i < totalwritenumber; i++) {
+		if (slog[i] != NULL) {
+			continue;
+		}
+		if (i < 32) { // update l_resendwrite
+			l_resendwrite |= (1 << i);
+		} else {
+			h_resendwrite |= (1 << (i - 32));
+		}
+	}
+
+	if (h_resendwrite == 0 && l_resendwrite == 0) { // send CommitYes
+		pktCommon_t *p = (pktCommon_t*)alloca(sizeof(pktCommon_t));
+		p->header.gid = htonl(sGlobalID);
+		p->header.seqid = htonl(sSeqNum);
+		sSeqNum++;
+		p->header.type = PKT_COMMITYES;
+
+		p->fileid = htonl(sfileid);
+		p->transNum = htonl(sTransNum);
+
+		print_header(&p->header, false);
+
+		if (sendto(ssock, (void *) p, sizeof(pktCommon_t),
+				0, (struct sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
+			RFError("SendOut fail\n");
+			//TODO
+		}
+
+	} else { // send CommitResend
+		pktCommitResend_t *p = (pktCommitResend_t*)alloca(sizeof(pktCommitResend_t));
+		p->header.gid = htonl(sGlobalID);
+		p->header.seqid = htonl(sSeqNum);
+		sSeqNum++;
+		p->header.type = PKT_COMMITRESEND;
+
+		p->fileid = htonl(sfileid);
+		p->transNum = htonl(sTransNum);
+		p->H_writeNumReq = htonl(h_resendwrite);
+		p->L_writeNumReq = htonl(l_resendwrite);
+
+		print_header(&p->header, false);
+		dbg_printf("HResend(%x)  LResend(%x)\n", h_resendwrite, l_resendwrite);
+
+		if (sendto(ssock, (void *) p, sizeof(pktCommitResend_t),
+				0, (struct sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
+			RFError("SendOut fail\n");
+			//TODO
+		}
+	}
+
+	return 0;
+}
+
+/* ----------------------------------------------------------------------- */
 
 int main(int argc, char *argv[]) {
 	int size = sizeof(Sockaddr);
@@ -242,6 +357,7 @@ int main(int argc, char *argv[]) {
 				processWrite(&pkt.writeblock);
 				break;
 			case PKT_COMMITREQ:
+				processCommitReq(&pkt.commitreq);
 				break;
 			case PKT_COMMITYES:
 				break;
