@@ -9,6 +9,7 @@
 
 #include <sys/time.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 enum {
   NormalReturn = 0,
@@ -45,11 +46,7 @@ int openfilereq();
 int commitreq(int fd);
 int commitPhase2(int fd);
 int aborting(int fd);
-//int processCommit(pktCommon_t *pkt);
-//int commitResend(pktCommitResend_t *pkt);
-
-//void getTimeDiff(struct timeval *x, struct timeval *y, struct timeval *diff);
-//void getPassTime(struct timeval *y, struct timeval *remain);
+int countServers(uint32_t *servers,  uint32_t gid);
 
 void getRemainTime(struct timeval start, long int timeout, struct timeval *remain);
 bool ismyLogEmpty();

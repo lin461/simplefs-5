@@ -443,17 +443,7 @@ int aborting(int fd) {
 
 		// count current servers
 		uint32_t sgid = ntohl(precv->header.gid);
-		int i = 0;
-		for (; i < currentServers; i++) {
-			if (serverids[i] == sgid) {
-				dbg_printf("Duplicated\n");
-				break;
-			}
-		}
-		if (i == currentServers) {
-			serverids[i] = sgid;
-			currentServers++;
-		}
+		currentServers = countServers(serverids, sgid);
 		dbg_printf("currentServers=%d\n", currentServers);
 	}
 
@@ -619,17 +609,7 @@ int commitreq(int fd) {
 
 			// count current servers
 			uint32_t sgid = ntohl(precv->header.gid);
-			int i = 0;
-			for(; i < currentServers; i++) {
-				if (serverids[i] == sgid) {
-					dbg_printf("Duplicated\n");
-					break;
-				}
-			}
-			if (i == currentServers) {
-				serverids[i] = sgid;
-				currentServers++;
-			}
+			currentServers = countServers(serverids, sgid);
 			dbg_printf("currentServers=%d\n", currentServers);
 		} else if (type == PKT_COMMITRESEND) {
 			dbg_printf("receive COMMIT RESEND packet.\n");
@@ -766,17 +746,7 @@ int commitPhase2(int fd) {
 
 		// count current servers
 		uint32_t sgid = ntohl(precv->header.gid);
-		int i = 0;
-		for(; i < currentServers; i++) {
-			if (serverids[i] == sgid) {
-				dbg_printf("Duplicated\n");
-				break;
-			}
-		}
-		if (i == currentServers) {
-			serverids[i] = sgid;
-			currentServers++;
-		}
+		currentServers = countServers(serverids, sgid);
 		dbg_printf("currentServers=%d\n", currentServers);
 	}
 
@@ -887,17 +857,7 @@ int openfilereq() {
 
 		// count current servers
 		uint32_t sgid = ntohl(precv->header.gid);
-		int i = 0;
-		for(; i < currentServers; i++) {
-			if (serverids[i] == sgid) {
-				dbg_printf("Duplicated\n");
-				break;
-			}
-		}
-		if (i == currentServers) {
-			serverids[i] = sgid;
-			currentServers++;
-		}
+		currentServers = countServers(serverids, sgid);
 		dbg_printf("currentServers=%d\n", currentServers);
 	}
 
@@ -993,17 +953,7 @@ int checkServers(int inputNumServers) {
 		pktHeader_t *precv = (pktHeader_t*)&pkt.header;
 		print_header(precv, true);
 		uint32_t sgid = ntohl(precv->gid);
-		int i = 0;
-		for(; i < currentServers; i++) {
-			if (serverids[i] == sgid) {
-				dbg_printf("Duplicated\n");
-				break;
-			}
-		}
-		if (i == currentServers) {
-			serverids[i] = sgid;
-			currentServers++;
-		}
+		currentServers = countServers(serverids, sgid);
 		dbg_printf("currentServers=%d\n", currentServers);
 	}
 
@@ -1070,4 +1020,24 @@ void cleanupmylog() {
 		}
 	}
 	return;
+}
+
+/* ------------------------------------------------------------------ */
+int countServers(uint32_t *servers, uint32_t gid) {
+	int i = 0;
+	for(; i < myNumServers; i++) {
+		if (servers[i] == gid) {
+			dbg_printf("Duplicated\n");
+			break;
+		}
+		if (servers[i] == 0) {
+			servers[i] = gid;
+			break;
+		}
+	}
+	int cnt = 0;
+	while (cnt < myNumServers && servers[cnt] != 0) {
+		cnt++;
+	}
+	return cnt;
 }
