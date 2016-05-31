@@ -154,9 +154,9 @@ void print_logentry(logEntry_t **slog) {
 	dbg_printf(" ================== END ======================== \n");
 }
 
-void print_servers(uint32_t *servers, int num) {
+void print_servers(uint32_t *servers) {
 	int i;
-	for (i = 0; i < num; i++) {
+	for (i = 0; i < MAXSERVERNUMBER; i++) {
 		if (servers[i] != 0) {
 			printf("[%d]%u\n", i, servers[i]);
 		}

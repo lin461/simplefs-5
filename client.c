@@ -241,7 +241,7 @@ int Commit(int fd) {
 	}
 
 	if (ismyLogEmpty()) {
-		printf("No outstanding changes.\n");
+		dbg_printf("No outstanding changes.\n");
 		return 0;
 	}
 	/****************************************************/
@@ -343,8 +343,8 @@ int aborting(int fd) {
 	pktGeneric_t pkt;
 	fd_set fdmask;
 
-	uint32_t serverids[myNumServers];
-	memset(serverids, 0, myNumServers);
+	uint32_t serverids[MAXSERVERNUMBER];
+	memset(serverids, 0, MAXSERVERNUMBER);
 
 	// send out abort packet
 	pktCommon_t *p = (pktCommon_t *) alloca(sizeof(pktCommon_t));
@@ -377,11 +377,11 @@ int aborting(int fd) {
 			return 0;
 		}
 		if (isTimeout(startTime, WAIT_TIMEOUT)) {
-			RFError(
+			dbg_printf(
 					"No enough servers. Abort truncate server number..");
 			// update current server number
 			myNumServers = currentServers;
-			print_servers(serverids, myNumServers);
+			print_servers(serverids);
 			return 0;
 		}
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
@@ -507,8 +507,8 @@ int commitreq(int fd) {
 	pktGeneric_t pkt;
 	fd_set fdmask;
 
-	uint32_t serverids[myNumServers];
-	memset(serverids, 0, myNumServers);
+	uint32_t serverids[MAXSERVERNUMBER];
+	memset(serverids, 0, MAXSERVERNUMBER);
 
 	// send out commitreq packet
 	pktCommitReq_t *p = (pktCommitReq_t *)alloca(sizeof(pktCommitReq_t));
@@ -542,10 +542,10 @@ int commitreq(int fd) {
 			return 0;
 		}
 		if (isTimeout(startTime, WAIT_TIMEOUT)) {
-			RFError("No enough servers. Commit 1st phase truncate server number..");
+			dbg_printf("No enough servers. Commit 1st phase truncate server number..");
 			// update current server number
 			myNumServers = currentServers;
-			print_servers(serverids, myNumServers);
+			print_servers(serverids);
 			return 0;
 		}
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
@@ -647,8 +647,8 @@ int commitPhase2(int fd) {
 	pktGeneric_t pkt;
 	fd_set fdmask;
 
-	uint32_t serverids[myNumServers];
-	memset(serverids, 0, myNumServers);
+	uint32_t serverids[MAXSERVERNUMBER];
+	memset(serverids, 0, MAXSERVERNUMBER);
 
 	// send out commit packet
 	pktCommon_t *p = (pktCommon_t *)alloca(sizeof(pktCommon_t));
@@ -684,7 +684,7 @@ int commitPhase2(int fd) {
 			RFError("No enough servers. Commit 2st phase truncate server number..");
 			// update current server number
 			myNumServers = currentServers;
-			print_servers(serverids, myNumServers);
+			print_servers(serverids);
 			return 0;
 		}
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
@@ -763,8 +763,8 @@ int openfilereq() {
 	pktGeneric_t pkt;
 	fd_set fdmask;
 
-	uint32_t serverids[myNumServers];
-	memset(serverids, 0, myNumServers);
+	uint32_t serverids[MAXSERVERNUMBER];
+	memset(serverids, 0, MAXSERVERNUMBER);
 
 	// send out open packet
 	pktOpen_t *p = (pktOpen_t *)alloca(sizeof(pktOpen_t));
@@ -906,7 +906,7 @@ int checkServers(int inputNumServers) {
 		}
 		if (isTimeout(startTime, WAIT_TIMEOUT)) {
 			printf("Init: No enough servers (%d).\n", currentServers);
-                        print_servers(serverids, myNumServers);
+                        print_servers(serverids);
 			return -1;
 		}
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
@@ -1025,7 +1025,7 @@ void cleanupmylog() {
 /* ------------------------------------------------------------------ */
 int countServers(uint32_t *servers, uint32_t gid) {
 	int i = 0;
-	for(; i < myNumServers; i++) {
+	for(; i < MAXSERVERNUMBER; i++) {
 		if (servers[i] == gid) {
 			dbg_printf("Duplicated\n");
 			break;
@@ -1036,7 +1036,7 @@ int countServers(uint32_t *servers, uint32_t gid) {
 		}
 	}
 	int cnt = 0;
-	while (cnt < myNumServers && servers[cnt] != 0) {
+	while (cnt < MAXSERVERNUMBER && servers[cnt] != 0) {
 		cnt++;
 	}
 	return cnt;
