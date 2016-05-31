@@ -35,7 +35,7 @@ int initServer(unsigned short portNum, char *mount, int drop) {
 	sport = portNum;
 	sPacketLoss = drop;
 	sSeqNum = 0;
-	sGlobalID = genRandom();
+	sGlobalID = genRandomNoZero();
 
 
 	strncpy(smountPath, mount, MAXMAXPATHLEN);
@@ -431,6 +431,8 @@ int main(int argc, char *argv[]) {
 	int cc;
 	pktGeneric_t pkt;
 
+	fprintf(stderr,"Server id (%u)\n", sGlobalID);
+
 	while(1) {
 //		cc = recvfrom(ssock, &pkt, sizeof(pkt), 0, (struct sockaddr *)sAddr, (socklen_t *)&size);
 		uint32_t rand = genRandom();
@@ -440,7 +442,7 @@ int main(int argc, char *argv[]) {
 			continue;
 		}
 		if ((rand % 100) < sPacketLoss) {
-			dbg_printf("packet dropped.\n");
+			dbg_printf("Server packet dropped.\n");
 			continue;
 		}
 

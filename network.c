@@ -164,14 +164,22 @@ void print_servers(uint32_t *servers) {
 }
 
 /* ----------------------------------------------------------------------- */
+uint32_t genRandomNoZero() {
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	srand(now.tv_usec / 1000);
+	uint32_t res;
+	while ((res = rand()) == 0) {
+		res = rand();
+	}
+	return res;
+}
+
+/* ----------------------------------------------------------------------- */
 uint32_t genRandom() {
-	  struct timeval	now;
-	  gettimeofday (&now, NULL);
-	  srand(now.tv_usec/16000);
-	  uint32_t res;
-	  while ((res = rand()) == 0) {
-                res = rand();
-          }
-          return res;
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	srand(now.tv_usec / 1000);
+	return rand();
 }
 

@@ -66,7 +66,7 @@ InitReplFs( unsigned short portNum, int packetLoss, int numServers ) {
 	myPacketLoss = packetLoss;
 	myNumServers = numServers;
 	mySeqNum = 0;
-	myGlobalID = genRandom();
+	myGlobalID = genRandomNoZero();
 	myTransNum = 0;
 
 
@@ -116,7 +116,7 @@ int OpenFile(char * fileName) {
 	strncpy(myFilename, fileName, MAXFILENAMELEN);
 	myFilename[MAXFILENAMELEN - 1] = '\0';
 
-	myFileID = genRandom();
+	myFileID = genRandomNoZero();
 
 	if (openfilereq() < 0) {
 		return -1;

@@ -132,6 +132,7 @@ void RFError(char *s);
 int netInit(in_port_t port, int *multisock, Sockaddr **groupAddr);
 bool isTimeout(struct timeval oldtime, long timeout);
 uint32_t genRandom();
+uint32_t genRandomNoZero();
 
 void print_header(pktHeader_t *pkt, bool recv);
 void print_writeBlk(pktWriteBlk_t *pkt, bool recv);
