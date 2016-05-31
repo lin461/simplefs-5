@@ -32,6 +32,15 @@ appl10() {
             return;
         }
     }
+    for (; i < 100; i++) {
+        lseek(fd, i * 256, SEEK_SET);
+        retVal = write( fd, commitStrBuf, 256 );
+        if (retVal <= 0) {
+            perror("write");
+            return;
+        }
+    }
+
 
     retVal = close( fd );
     if (retVal < 0) {

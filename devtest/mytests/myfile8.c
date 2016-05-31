@@ -80,6 +80,15 @@ appl8() {
             return;
         }
     }
+    for (; i < 100; i++) {
+        lseek(fd, 50 * 512 + i * 512, SEEK_SET);
+        retVal = write( fd, commitStrBuf, 512 );
+        if (retVal <= 0) {
+            perror("write");
+            return;
+        }
+    }
+
 
     retVal = close( fd );
     if (retVal < 0) {

@@ -146,7 +146,7 @@ int netInit(in_port_t port, int *multisock, Sockaddr **groupAddr) {
 //	dbg_printf("Finish netInit: addr = %p\n", nullAddr);
 	*multisock = sock;
 
-	return 1;
+	return 0;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -180,44 +180,44 @@ void initPktHeader(pktHeader_t *pkt, uint16_t type, uint32_t gid,
 /* ----------------------------------------------------------------------- */
 // Helper
 void print_header(pktHeader_t *pkt, bool recv) {
-	if (recv) {
-		dbg_printf("--Receive-----------------------------------\n");
-	} else {
-		dbg_printf("--Send-------------------------------------\n");
-	}
-	dbg_printf("|\ttype\t=\t%d\n", pkt->type);
-	dbg_printf("|\tgid\t=\t%u\n", ntohl(pkt->gid));
-	dbg_printf("|\tseqid\t=\t%u\n", ntohl(pkt->seqid));
-	dbg_printf("--------------------------------------------\n");
+//	if (recv) {
+//		dbg_printf("--Receive-----------------------------------\n");
+//	} else {
+//		dbg_printf("--Send-------------------------------------\n");
+//	}
+//	dbg_printf("|\ttype\t=\t%d\n", pkt->type);
+//	dbg_printf("|\tgid\t=\t%u\n", ntohl(pkt->gid));
+///	dbg_printf("|\tseqid\t=\t%u\n", ntohl(pkt->seqid));
+//	dbg_printf("--------------------------------------------\n");
 }
 
 void print_writeBlk(pktWriteBlk_t *pkt, bool recv) {
-	if (recv) {
-		dbg_printf("--Receive-----------------------------------\n");
-	} else {
-		dbg_printf("--Send-------------------------------------\n");
-	}
-	dbg_printf("|\ttype\t=\t%d\n", pkt->header.type);
-	dbg_printf("|\tgid\t=\t%u\n", ntohl(pkt->header.gid));
-	dbg_printf("|\tseqid\t=\t%u\n", ntohl(pkt->header.seqid));
-	dbg_printf("|\tfildid\t=\t%u\n", ntohl(pkt->fileid));
-	dbg_printf("|\ttranc# = %u, write# = %d\n", ntohl(pkt->transNum), pkt->writeNum);
-	dbg_printf("|\tsize = %u, offset = %u\n", ntohs(pkt->blocksize), ntohl(pkt->offset));
-	dbg_printf("--------------------------------------------\n");
+//	if (recv) {
+//		dbg_printf("--Receive-----------------------------------\n");
+//	} else {
+//		dbg_printf("--Send-------------------------------------\n");
+//	}
+//	dbg_printf("|\ttype\t=\t%d\n", pkt->header.type);
+//	dbg_printf("|\tgid\t=\t%u\n", ntohl(pkt->header.gid));
+//	dbg_printf("|\tseqid\t=\t%u\n", ntohl(pkt->header.seqid));
+//	dbg_printf("|\tfildid\t=\t%u\n", ntohl(pkt->fileid));
+//	dbg_printf("|\ttranc# = %u, write# = %d\n", ntohl(pkt->transNum), pkt->writeNum);
+//	dbg_printf("|\tsize = %u, offset = %u\n", ntohs(pkt->blocksize), ntohl(pkt->offset));
+//	dbg_printf("--------------------------------------------\n");
 }
 
 void print_logentry(logEntry_t **slog) {
-	dbg_printf(" ================== LOG ======================== \n");
-	if (slog == NULL) {
-		return;
-	}
-	int i = 0;
-	for (; i < MAXWRITENUM; i++) {
-		if (slog[i] == NULL)
-			continue;
-		dbg_printf("\t[%d]\tsize(%d)\toffset(%u)\n", i, slog[i]->size, slog[i]->offset);
-	}
-	dbg_printf(" ================== END ======================== \n");
+//	dbg_printf(" ================== LOG ======================== \n");
+//	if (slog == NULL) {
+//		return;
+//	}
+//	int i = 0;
+//	for (; i < MAXWRITENUM; i++) {
+//		if (slog[i] == NULL)
+//			continue;
+//		dbg_printf("\t[%d]\tsize(%d)\toffset(%u)\n", i, slog[i]->size, slog[i]->offset);
+//	}
+//	dbg_printf(" ================== END ======================== \n");
 }
 
 void print_servers(uint32_t *servers, int num) {

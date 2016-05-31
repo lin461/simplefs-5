@@ -165,12 +165,12 @@ int WriteBlock(int fd, char * buffer, int byteOffset, int blockSize) {
 #endif
 
 	if (myFileID == -1) {
-		printf("No open file. \n");
+		dbg_printf("No open file. \n");
 		return -1;
 	}
 
 	if (myFileID != fd) {
-		printf("Different open file.\n");
+		dbg_printf("Different open file.\n");
 		return -1;
 	}
 
@@ -434,7 +434,7 @@ int aborting(int fd) {
 		uint32_t pktgid = ntohl(pkt.header.gid);
 		// process packet and update server number
 		if (pkt.header.type != PKT_ABORTACK || pktgid == myGlobalID) {
-			dbg_printf("skip Wrong type or mine\n");
+//			dbg_printf("skip Wrong type or mine\n");
 			continue;
 		}
 
@@ -614,7 +614,7 @@ int commitreq(int fd) {
 		uint32_t pktgid = ntohl(pkt.header.gid);
 		// process packet and update server number
 		if (pktgid == myGlobalID) {
-			dbg_printf("Drop self packet\n");
+		//	dbg_printf("Drop self packet\n");
 			continue;
 		}
 
@@ -767,7 +767,7 @@ int commitPhase2(int fd) {
 		uint32_t pktgid = ntohl(pkt.header.gid);
 		// process packet and update server number
 		if (pkt.header.type != PKT_COMMITACK || pktgid == myGlobalID) {
-			dbg_printf("skip Wrong type or mine\n");
+//			dbg_printf("skip Wrong type or mine\n");
 			continue;
 		}
 
@@ -890,7 +890,7 @@ int openfilereq() {
 			continue;
 		}
 		// drop packet
-		dbg_printf("=== drop rate = %d\n", myPacketLoss);
+//		dbg_printf("=== drop rate = %d\n", myPacketLoss);
 		if ((rand % 100) < myPacketLoss) {
 			dbg_printf("packet dropped.\n");
 			continue;
@@ -899,7 +899,7 @@ int openfilereq() {
 		uint32_t pktgid = ntohl(pkt.header.gid);
 		// process packet and update server number
 		if (pkt.header.type != PKT_OPENACK || pktgid == myGlobalID) {
-			dbg_printf("Wrong type or mine\n");
+//			dbg_printf("Wrong type or mine\n");
 			continue;
 		}
 
@@ -978,6 +978,7 @@ int checkServers(int inputNumServers) {
 		}
 		if (isTimeout(startTime, WAIT_TIMEOUT)) {
 			printf("Init: No enough servers (%d).", currentServers);
+                        print_servers(serverids, myNumServers);
 			return -1;
 		}
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
@@ -1018,7 +1019,7 @@ int checkServers(int inputNumServers) {
 		uint32_t pktgid = ntohl(pkt.header.gid);
 		// process packet and update server number
 		if (pkt.header.type != PKT_INITACK || pktgid == myGlobalID) {
-			dbg_printf("Wrong type or mine\n");
+//			dbg_printf("Wrong type or mine\n");
 			continue;
 		}
 

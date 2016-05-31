@@ -42,7 +42,7 @@ int initServer(unsigned short portNum, char *mount, int drop) {
 
 
 	strncpy(smountPath, mount, MAXMAXPATHLEN);
-	dbg_printf("mount path - %s!\n", smountPath);
+	printf("mount path - %s!\n", smountPath);
 
 	int res = mkdir(smountPath, 0777);
 	if (res == -1) {
@@ -58,7 +58,7 @@ int initServer(unsigned short portNum, char *mount, int drop) {
   	dbg_printf("Finish InitReplFs: mysock = %d\n", ssock);
   	dbg_printf("Finish InitReplFs: myAddr = %p\n", sAddr);
 
-	return 1;
+	return 0;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -299,6 +299,7 @@ int processCommit(pktCommon_t *pkt){
 		if (slog[i] == NULL) {
 			continue;
 		}
+                dbg_printf(" ---------- lseek (%u)\n", slog[i]->offset);
 		if (lseek(fd, slog[i]->offset, SEEK_SET) < 0) {
 			RFError("WriteBlock Seek");
 			close(fd);

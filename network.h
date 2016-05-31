@@ -124,8 +124,8 @@ typedef union GenericPkt {
 
 /*****************************/
 typedef struct logEntry {
-	uint16_t offset;
 	uint16_t size;
+	uint32_t offset;
 	char buffer[MAXBUFFERSIZE];
 } logEntry_t;
 
