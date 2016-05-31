@@ -168,6 +168,10 @@ uint32_t genRandom() {
 	  struct timeval	now;
 	  gettimeofday (&now, NULL);
 	  srand(now.tv_usec/16000);
-	  return random();
+	  uint32_t res;
+	  while ((res = rand()) == 0) {
+                res = rand();
+          }
+          return res;
 }
 

@@ -344,7 +344,7 @@ int aborting(int fd) {
 	fd_set fdmask;
 
 	uint32_t serverids[MAXSERVERNUMBER];
-	memset(serverids, 0, MAXSERVERNUMBER);
+	memset(serverids, 0, sizeof(serverids));
 
 	// send out abort packet
 	pktCommon_t *p = (pktCommon_t *) alloca(sizeof(pktCommon_t));
@@ -508,7 +508,7 @@ int commitreq(int fd) {
 	fd_set fdmask;
 
 	uint32_t serverids[MAXSERVERNUMBER];
-	memset(serverids, 0, MAXSERVERNUMBER);
+	memset(serverids, 0, sizeof(serverids));
 
 	// send out commitreq packet
 	pktCommitReq_t *p = (pktCommitReq_t *)alloca(sizeof(pktCommitReq_t));
@@ -648,7 +648,7 @@ int commitPhase2(int fd) {
 	fd_set fdmask;
 
 	uint32_t serverids[MAXSERVERNUMBER];
-	memset(serverids, 0, MAXSERVERNUMBER);
+	memset(serverids, 0, sizeof(serverids));
 
 	// send out commit packet
 	pktCommon_t *p = (pktCommon_t *)alloca(sizeof(pktCommon_t));
@@ -764,7 +764,7 @@ int openfilereq() {
 	fd_set fdmask;
 
 	uint32_t serverids[MAXSERVERNUMBER];
-	memset(serverids, 0, MAXSERVERNUMBER);
+	memset(serverids, 0, sizeof(serverids));
 
 	// send out open packet
 	pktOpen_t *p = (pktOpen_t *)alloca(sizeof(pktOpen_t));
@@ -798,6 +798,7 @@ int openfilereq() {
 		}
 		if (isTimeout(startTime, WAIT_TIMEOUT)) {
 			RFError("No enough servers. close fileID..");
+                        print_servers(serverids);
 			// close file
 			myFileID = -1;
 			if (myFilename != NULL)
@@ -875,8 +876,8 @@ int checkServers(int inputNumServers) {
 
 	fd_set fdmask;
 
-	uint32_t serverids[inputNumServers];
-	memset(serverids, 0, inputNumServers);
+	uint32_t serverids[MAXSERVERNUMBER];
+	memset(serverids, 0, sizeof(serverids));
 	// sendout Init packet
 	pktHeader_t *p = (pktHeader_t*)alloca(sizeof(pktHeader_t));
 	p->gid = htonl(myGlobalID);

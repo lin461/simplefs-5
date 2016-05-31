@@ -3,6 +3,7 @@ ifndef RUNDIR
 endif
 
 CFLAGS = -g -DSUN -lssl -fpermissive
+CFLAGS += -Wno-write-strings
 CC = g++
 CCF = $(CC) $(CFLAGS)
 
