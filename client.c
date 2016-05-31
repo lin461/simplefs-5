@@ -1,5 +1,5 @@
 /****************/
-/* Your Name	*/
+/* Your Name	Ying Gao*/
 /* Date		*/
 /* CS 244B	*/
 /* Spring 2014	*/
@@ -39,9 +39,6 @@ static uint32_t 	mySeqNum	= -1;
 static uint32_t	myGlobalID;
 
 static logEntry_t *myLogs[MAXWRITENUM];
-
-//static struct timeval myLastStartTime;
-//static struct timeval myLastSendTime;
 
 /* ------------------------------------------------------------------ */
 
@@ -83,18 +80,10 @@ InitReplFs( unsigned short portNum, int packetLoss, int numServers ) {
   	dbg_printf("Finish InitReplFs: mysock = %d\n", mySock);
   	dbg_printf("Finish InitReplFs: mtAddr = %p\n", myAddr);
 
-  	// init log array
-//  	myWriteLogs = (logEntry_t*)calloc(myNumServers, sizeof(logEntry_t));
-//  	if (myWriteLogs == NULL) {
-//  		RFError("No memory.");
-//  		return ErrorReturn;
-//  	}
 
   	if (checkServers(numServers) < 0) {
   		return ErrorReturn;
   	}
-
-//  	dbg_printf("done check server\n");
 
 
   	return NormalReturn;
@@ -208,7 +197,6 @@ int WriteBlock(int fd, char * buffer, int byteOffset, int blockSize) {
 			0, (struct sockaddr *) myAddr, sizeof(Sockaddr));
 	if (res <= 0) {
 		RFError("SendOut fail\n");
-		// TODO how to deal with this
 		return ErrorReturn;
 	}
 
@@ -373,7 +361,6 @@ int aborting(int fd) {
 	if (sendto(mySock, (void *) p, sizeof(pktCommon_t), 0,
 			(struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 		RFError("SendOut fail\n");
-		// TODO how to deal with this
 		return ErrorReturn;
 	}
 
@@ -503,14 +490,12 @@ int commitResend(pktCommitResend_t *pkt) {
 			p->transNum = htonl(myTransNum);
 			p->writeNum = index;;
 
-		//	print_header(&p->header, false);
 			print_writeBlk(p, false);
 
 			int res = sendto(mySock, (void *) p, sizeof(pktWriteBlk_t),
 					0, (struct sockaddr *) myAddr, sizeof(Sockaddr));
 			if (res <= 0) {
 				RFError("SendOut fail\n");
-				// TODO how to deal with this
 				return ErrorReturn;
 			}
 		}
@@ -551,7 +536,6 @@ int commitreq(int fd) {
 	if (sendto(mySock, (void *) p, sizeof(pktCommitReq_t),
 			0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 		RFError("SendOut fail\n");
-		// TODO how to deal with this
 		return ErrorReturn;
 	}
 
@@ -560,7 +544,6 @@ int commitreq(int fd) {
 
 	int size = sizeof(Sockaddr);
 	while (1) {
-//		dbg_printf("in while...\n");
 		FD_ZERO(&fdmask);
 		FD_SET(mySock, &fdmask);
 
@@ -578,12 +561,10 @@ int commitreq(int fd) {
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
 			dbg_printf("timeout resend.\n");
 			print_header(&p->header, false);
-//			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
 			dbg_printf("file(%u)\t trans#(%u) \t totalWrite#(%d)\n", myFileID, myTransNum, myWriteNum);
 			if (sendto(mySock, (void *) p, sizeof(pktCommitReq_t),
 					0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 				RFError("SendOut fail");
-				// TODO how to deal with this
 				return ErrorReturn;
 			}
 			gettimeofday (&sendTime, NULL);
@@ -592,7 +573,6 @@ int commitreq(int fd) {
 		struct timeval remain;
 		getRemainTime(sendTime, RESEND_TIMEOUT_SEC, &remain);
 
-//		dbg_printf("... here time = %ld.%06ld \n", remain.tv_sec, remain.tv_usec);
 		if (select(32, &fdmask, NULL, NULL, &remain) <= 0) {
 			dbg_printf("continue from select.\n");
 			continue;
@@ -705,7 +685,6 @@ int commitPhase2(int fd) {
 	if (sendto(mySock, (void *) p, sizeof(pktCommon_t),
 			0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 		RFError("SendOut fail\n");
-		// TODO how to deal with this
 		return ErrorReturn;
 	}
 
@@ -731,12 +710,10 @@ int commitPhase2(int fd) {
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
 			dbg_printf("timeout resend.\n");
 			print_header(&p->header, false);
-//			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
 			dbg_printf("file(%u)\t trans#(%u) \t\n", myFileID, myTransNum);
 			if (sendto(mySock, (void *) p, sizeof(pktCommon_t),
 					0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 				RFError("SendOut fail");
-				// TODO how to deal with this
 				return ErrorReturn;
 			}
 			gettimeofday (&sendTime, NULL);
@@ -833,7 +810,6 @@ int openfilereq() {
 	if (sendto(mySock, (void *) p, sizeof(pktOpen_t),
 			0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 		RFError("SendOut fail\n");
-		// TODO how to deal with this
 		return ErrorReturn;
 	}
 
@@ -843,7 +819,6 @@ int openfilereq() {
 	int size = sizeof(Sockaddr);
 
 	while (1) {
-//		dbg_printf("in while...\n");
 		FD_ZERO(&fdmask);
 		FD_SET(mySock, &fdmask);
 
@@ -863,11 +838,9 @@ int openfilereq() {
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
 			dbg_printf("timeout resend.\n");
 			print_header(&p->header, false);
-//			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
 			if (sendto(mySock, (void *) p, sizeof(pktOpen_t),
 					0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 				RFError("SendOut fail");
-				// TODO how to deal with this
 				return ErrorReturn;
 			}
 			gettimeofday (&sendTime, NULL);
@@ -890,7 +863,6 @@ int openfilereq() {
 			continue;
 		}
 		// drop packet
-//		dbg_printf("=== drop rate = %d\n", myPacketLoss);
 		if ((rand % 100) < myPacketLoss) {
 			dbg_printf("packet dropped.\n");
 			continue;
@@ -954,21 +926,17 @@ int checkServers(int inputNumServers) {
 
 	print_header(p, false);
 
-//	dbg_printf("myAddr = %p, p = %p\n", myAddr, p);
 	if (sendto(mySock, (void *) p, sizeof(pktHeader_t),
 			0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 		RFError("SendOut fail\n");
-		// TODO how to deal with this
 		return ErrorReturn;
 	}
-//	dbg_printf("== myAddr = %p, p = %p\n", myAddr, p);
 
 	gettimeofday (&startTime, NULL);
 	gettimeofday (&sendTime, NULL);
 
 	int size = sizeof(Sockaddr);
 	while (1) {
-//		dbg_printf("in while...\n");
 		FD_ZERO(&fdmask);
 		FD_SET(mySock, &fdmask);
 
@@ -977,18 +945,16 @@ int checkServers(int inputNumServers) {
 			return 0;
 		}
 		if (isTimeout(startTime, WAIT_TIMEOUT)) {
-			printf("Init: No enough servers (%d).", currentServers);
+			printf("Init: No enough servers (%d).\n", currentServers);
                         print_servers(serverids, myNumServers);
 			return -1;
 		}
 		if (isTimeout(sendTime, RESEND_TIMEOUT)) { //Resend
 			dbg_printf("timeout resend.\n");
 			print_header(p, false);
-//			dbg_printf("mtsock = %d, myAddr = %p, p = %p\n", mySock, myAddr, p);
 			if (sendto(mySock, (void *) p, sizeof(pktHeader_t),
 					0, (struct sockaddr *) myAddr, sizeof(Sockaddr)) <= 0) {
 				RFError("SendOut fail");
-				// TODO how to deal with this
 				return ErrorReturn;
 			}
 			gettimeofday (&sendTime, NULL);

@@ -1,8 +1,5 @@
 /*
  * network.c
- *
- *  Created on: May 25, 2016
- *      Author: gy
  */
 
 #include <netinet/in.h>
@@ -11,78 +8,15 @@
 
 #include "network.h"
 
-///* get hostname and host socket */
-//void
-//getHostName(char *prompt, char **hostName, Sockaddr *hostAddr)
-//{
-//	char		buf[128];
-//	Sockaddr	*AddrTemp;
-//
-//	buf[0] = '\0';
-//	for (AddrTemp = (Sockaddr *)NULL; AddrTemp == (Sockaddr *)NULL; )
-//	  {
-//		printf("%s %s: " , prompt, "(CR for any host)");
-//		fgets(buf, sizeof(buf)-1, stdin);
-//		if (strlen(buf) == 0)
-//			break;
-//		*hostName = (char*)malloc((unsigned) (strlen(buf) + 1));
-//		if (*hostName == NULL)
-//			RFError("no mem for hostName");
-//		strcpy(*hostName, buf);
-//
-//		/* check for valid maze name */
-//		AddrTemp = resolveHost(*hostName);
-//		if (AddrTemp== (Sockaddr *) NULL) {
-//			printf("Don't know host %s\n", *hostName);
-//			free(*hostName);
-//			*hostName = NULL;
-//		}
-//	}
-//	if ((*hostName != NULL) &&
-//	    (strlen(*hostName) != 0))
-//		bcopy((char *) AddrTemp, (char *) hostAddr, sizeof(Sockaddr));
-//}
-//
-///* ----------------------------------------------------------------------- */
-//
-//Sockaddr *
-//resolveHost(register char *name)
-//{
-//	register struct hostent *fhost;
-//	struct in_addr fadd;
-//	static Sockaddr sa;
-//
-//	if ((fhost = gethostbyname(name)) != NULL) {
-//		sa.sin_family = fhost->h_addrtype;
-//		sa.sin_port = 0;
-//		bcopy(fhost->h_addr, &sa.sin_addr, fhost->h_length);
-//	} else {
-//		fadd.s_addr = inet_addr(name);
-//		if (fadd.s_addr != -1) {
-//			sa.sin_family = AF_INET;	/* grot */
-//			sa.sin_port = 0;
-//			sa.sin_addr.s_addr = fadd.s_addr;
-//		} else
-//			return(NULL);
-//	}
-//	return(&sa);
-//}
-
 /* ----------------------------------------------------------------------- */
 
 int netInit(in_port_t port, int *multisock, Sockaddr **groupAddr) {
 	dbg_printf("=== entering netInit === \n");
 	Sockaddr *nullAddr;
-//	Sockaddr		*thisHost;
-//	char			buf[128];
 	int reuse;
 	u_char ttl;
 	struct ip_mreq mreq;
 	int sock;
-
-//	gethostname(buf, sizeof(buf));
-//	if ((thisHost = resolveHost(buf)) == (Sockaddr *) NULL)
-//		RFError("who am I?");
 
 	nullAddr = (Sockaddr*) malloc(sizeof(Sockaddr));
 	if (nullAddr == NULL) {
@@ -180,44 +114,44 @@ void initPktHeader(pktHeader_t *pkt, uint16_t type, uint32_t gid,
 /* ----------------------------------------------------------------------- */
 // Helper
 void print_header(pktHeader_t *pkt, bool recv) {
-//	if (recv) {
-//		dbg_printf("--Receive-----------------------------------\n");
-//	} else {
-//		dbg_printf("--Send-------------------------------------\n");
-//	}
-//	dbg_printf("|\ttype\t=\t%d\n", pkt->type);
-//	dbg_printf("|\tgid\t=\t%u\n", ntohl(pkt->gid));
-///	dbg_printf("|\tseqid\t=\t%u\n", ntohl(pkt->seqid));
-//	dbg_printf("--------------------------------------------\n");
+	if (recv) {
+		dbg_printf("--Receive-----------------------------------\n");
+	} else {
+		dbg_printf("--Send-------------------------------------\n");
+	}
+	dbg_printf("|\ttype\t=\t%d\n", pkt->type);
+	dbg_printf("|\tgid\t=\t%u\n", ntohl(pkt->gid));
+/	dbg_printf("|\tseqid\t=\t%u\n", ntohl(pkt->seqid));
+	dbg_printf("--------------------------------------------\n");
 }
 
 void print_writeBlk(pktWriteBlk_t *pkt, bool recv) {
-//	if (recv) {
-//		dbg_printf("--Receive-----------------------------------\n");
-//	} else {
-//		dbg_printf("--Send-------------------------------------\n");
-//	}
-//	dbg_printf("|\ttype\t=\t%d\n", pkt->header.type);
-//	dbg_printf("|\tgid\t=\t%u\n", ntohl(pkt->header.gid));
-//	dbg_printf("|\tseqid\t=\t%u\n", ntohl(pkt->header.seqid));
-//	dbg_printf("|\tfildid\t=\t%u\n", ntohl(pkt->fileid));
-//	dbg_printf("|\ttranc# = %u, write# = %d\n", ntohl(pkt->transNum), pkt->writeNum);
-//	dbg_printf("|\tsize = %u, offset = %u\n", ntohs(pkt->blocksize), ntohl(pkt->offset));
-//	dbg_printf("--------------------------------------------\n");
+	if (recv) {
+		dbg_printf("--Receive-----------------------------------\n");
+	} else {
+		dbg_printf("--Send-------------------------------------\n");
+	}
+	dbg_printf("|\ttype\t=\t%d\n", pkt->header.type);
+	dbg_printf("|\tgid\t=\t%u\n", ntohl(pkt->header.gid));
+	dbg_printf("|\tseqid\t=\t%u\n", ntohl(pkt->header.seqid));
+	dbg_printf("|\tfildid\t=\t%u\n", ntohl(pkt->fileid));
+	dbg_printf("|\ttranc# = %u, write# = %d\n", ntohl(pkt->transNum), pkt->writeNum);
+	dbg_printf("|\tsize = %u, offset = %u\n", ntohs(pkt->blocksize), ntohl(pkt->offset));
+	dbg_printf("--------------------------------------------\n");
 }
 
 void print_logentry(logEntry_t **slog) {
-//	dbg_printf(" ================== LOG ======================== \n");
-//	if (slog == NULL) {
-//		return;
-//	}
-//	int i = 0;
-//	for (; i < MAXWRITENUM; i++) {
-//		if (slog[i] == NULL)
-//			continue;
-//		dbg_printf("\t[%d]\tsize(%d)\toffset(%u)\n", i, slog[i]->size, slog[i]->offset);
-//	}
-//	dbg_printf(" ================== END ======================== \n");
+	dbg_printf(" ================== LOG ======================== \n");
+	if (slog == NULL) {
+		return;
+	}
+	int i = 0;
+	for (; i < MAXWRITENUM; i++) {
+		if (slog[i] == NULL)
+			continue;
+		dbg_printf("\t[%d]\tsize(%d)\toffset(%u)\n", i, slog[i]->size, slog[i]->offset);
+	}
+	dbg_printf(" ================== END ======================== \n");
 }
 
 void print_servers(uint32_t *servers, int num) {

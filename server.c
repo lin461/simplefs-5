@@ -1,8 +1,5 @@
 /*
  * server.c
- *
- *  Created on: May 27, 2016
- *      Author: gy
  */
 
 #include <fcntl.h>
@@ -80,7 +77,6 @@ void processPktInit(pktHeader_t *pkt) {
 	if (sendto(ssock, (void *) p, sizeof(pktHeader_t),
 			0, (struct sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
 		RFError("SendOut fail\n");
-		//TODO
 	}
 }
 
@@ -155,14 +151,7 @@ int processPktOpen(pktOpen_t *pkt) {
 	if (sendto(ssock, (void *) p, sizeof(pktOpenACK_t),
 			0, (struct sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
 		RFError("SendOut fail\n");
-		//TODO
 	}
-
-	// init slog
-
-	// init write number
-
-
 
 	return sfileid;
 }
@@ -391,7 +380,6 @@ int processCommitReq(pktCommitReq_t *pkt){
 		if (sendto(ssock, (void *) p, sizeof(pktCommon_t),
 				0, (struct sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
 			RFError("SendOut fail\n");
-			//TODO
 		}
 
 	} else { // send CommitResend
@@ -412,7 +400,6 @@ int processCommitReq(pktCommitReq_t *pkt){
 		if (sendto(ssock, (void *) p, sizeof(pktCommitResend_t),
 				0, (struct sockaddr *) sAddr, sizeof(Sockaddr)) < 0) {
 			RFError("SendOut fail\n");
-			//TODO
 		}
 	}
 
@@ -444,14 +431,12 @@ int main(int argc, char *argv[]) {
 	int cc;
 	pktGeneric_t pkt;
 
-	// TODO check input
 	while(1) {
 //		cc = recvfrom(ssock, &pkt, sizeof(pkt), 0, (struct sockaddr *)sAddr, (socklen_t *)&size);
 		uint32_t rand = genRandom();
 		cc = recvfrom(ssock, &pkt, sizeof(pkt), 0, NULL, NULL);
 		if (cc <= 0) {
 			RFError("recev error.");
-			//TODO
 			continue;
 		}
 		if ((rand % 100) < sPacketLoss) {

@@ -1,8 +1,5 @@
 /*
  * network.h
- *
- *  Created on: May 25, 2016
- *      Author: gy
  */
 
 #ifndef NETWORK_H_
@@ -131,8 +128,6 @@ typedef struct logEntry {
 
 
 void RFError(char *s);
-//void getHostName(char *prompt, char **hostName, Sockaddr *hostAddr);
-//Sockaddr *resolveHost(register char *name);
 int netInit(in_port_t port, int *multisock, Sockaddr **groupAddr);
 bool isTimeout(struct timeval oldtime, long timeout);
 uint32_t genRandom();
