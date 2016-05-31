@@ -121,7 +121,7 @@ void print_header(pktHeader_t *pkt, bool recv) {
 	}
 	dbg_printf("|\ttype\t=\t%d\n", pkt->type);
 	dbg_printf("|\tgid\t=\t%u\n", ntohl(pkt->gid));
-/	dbg_printf("|\tseqid\t=\t%u\n", ntohl(pkt->seqid));
+	dbg_printf("|\tseqid\t=\t%u\n", ntohl(pkt->seqid));
 	dbg_printf("--------------------------------------------\n");
 }
 
